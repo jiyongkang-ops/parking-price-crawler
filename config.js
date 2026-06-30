@@ -1,0 +1,43 @@
+// 収集設定 ----------------------------------------------------------------
+// 「節度ある収集」の挙動はここで一元管理する。
+
+export const config = {
+  // 正体を明かす User-Agent（用途と連絡先を明記）
+  userAgent:
+    "PitPortResearchBot/0.1 (parking price research; +mailto:jiyong.kang@landit.co.jp)",
+
+  // アクセス間隔（ミリ秒）。1リクエストごとに最低この時間スリープ（直列実行）
+  minDelayMs: 4000,
+
+  // robots.txt のキャッシュ有効期間（ミリ秒）
+  robotsCacheMs: 24 * 60 * 60 * 1000,
+
+  // 同一ページの再取得を抑制するキャッシュ期間（ミリ秒）。
+  // この期間内に既に取得済みなら取得をスキップする。
+  pageCacheMs: 6 * 60 * 60 * 1000,
+
+  // リクエストのタイムアウト（ミリ秒）
+  timeoutMs: 20000,
+
+  // 取得対象。自社サブリース物件の周辺競合をここに登録していく。
+  //   repark: { operator:"repark", parkId:"REP00xxxxx" }  個別物件単位
+  //   npc:    { operator:"npc", cityId:"685", prefId:13 } 市区町村単位（その市区の全NPC物件を一括取得）
+  targets: [
+    // 日本パーキング(NPC) — 全国を bbox API で一括取得（1リクエストで全国 約1,700件）
+    { operator: "npc", mode: "nationwide", label: "NPC全国" },
+
+    // 三井のリパーク — 全国16,000件超を sitemap からローリング巡回（数日で1巡）
+    { operator: "repark", mode: "nationwide", label: "repark全国" },
+  ],
+
+  // repark 全国ローリング巡回で、1回の実行で取得する最大件数。
+  // 3000件 ≒ 1回 約3.3時間（4秒間隔）。1日3回で約9,000件/日 → 約2日で全国1巡。
+  reparkRollingPerRun: 3000,
+
+  // 全国規模では全件を毎回追記するとファイルが肥大するため、
+  // 「新規 or 料金変動した物件のみ」追記する（時系列＝変化点の記録になる）。
+  appendOnlyChanges: true,
+
+  // 出力先（時系列を JSONL で追記）
+  outFile: "data/prices.jsonl",
+};
