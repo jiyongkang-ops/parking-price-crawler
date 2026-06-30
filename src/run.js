@@ -17,10 +17,14 @@ import { searchUrl, locationUrl, JAPAN_BBOX, parseNpcSearch } from "./npc.js";
 import {
   getAllParkIds, loadCrawlState, saveCrawlState, pickRolling,
 } from "./repark-enumerate.js";
+import { parseTimesDetail } from "./times.js";
+import { getAllParkUrls } from "./times-enumerate.js";
 
 const STATE = {
   reparkSitemapCache: "data/repark-sitemap.xml",
   reparkCrawlState: "data/repark-crawl-state.json",
+  timesUrlsCache: "data/times-park-urls.txt",
+  timesCrawlState: "data/times-crawl-state.json",
 };
 
 function readLastSnapshots(file) {
@@ -48,12 +52,19 @@ function feeFingerprint(rec) {
 }
 
 async function main() {
-  const outFile = path.resolve(config.outFile);
+  // OUT_FILE で出力先を上書き可（ワークフロー分割時の push 競合回避用）。
+  const outFile = path.resolve(process.env.OUT_FILE || config.outFile);
   fs.mkdirSync(path.dirname(outFile), { recursive: true });
   const last = readLastSnapshots(outFile);
   const now = new Date().toISOString();
 
   const stats = { processed: 0, written: 0, changed: 0, isNew: 0 };
+
+  // CRAWL_ONLY=times / npc,repark などで対象事業者を絞れる（ワークフロー分割用）。
+  const only = (process.env.CRAWL_ONLY || "").split(",").map((s) => s.trim()).filter(Boolean);
+  const targets = only.length
+    ? config.targets.filter((t) => only.includes(t.operator))
+    : config.targets;
 
   // 1物件分の処理（差分検知＋追記）。
   function handleRecord(rec) {
@@ -84,7 +95,7 @@ async function main() {
     return repr && Date.now() - new Date(repr.fetchedAt).getTime() < config.pageCacheMs;
   }
 
-  for (const t of config.targets) {
+  for (const t of targets) {
     // ---- NPC 全国（bbox 一括） ----
     if (t.operator === "npc" && t.mode === "nationwide") {
       const url = locationUrl(JAPAN_BBOX, { limit: 2000 });
@@ -143,6 +154,35 @@ async function main() {
       continue;
     }
 
+    // ---- タイムズ 全国（ローリング巡回） ----
+    // 先方が商用ボットを名指しブロックしている点に配慮し、間隔を長め(timesMinDelayMs)に。
+    if (t.operator === "times" && t.mode === "nationwide") {
+      let urls;
+      try {
+        urls = await getAllParkUrls({ cacheFile: STATE.timesUrlsCache, cacheMs: 7 * 864e5 });
+      } catch (e) { console.error(`[error] times sitemap: ${e.message}`); continue; }
+      const state = loadCrawlState(STATE.timesCrawlState);
+      const perRun = config.timesRollingPerRun ?? 2000;
+      const delay = config.timesMinDelayMs ?? 6000;
+      const batch = pickRolling(urls, state, perRun);
+      const visited = urls.filter((u) => state[u]).length;
+      console.log(
+        `[タイムズ全国] 全${urls.length}件 / 既訪${visited}件 / 今回${batch.length}件取得(間隔${delay / 1000}秒)。` +
+        `1巡目安: 約${Math.ceil(urls.length / perRun)}回実行`
+      );
+      for (const url of batch) {
+        let res;
+        try { res = await politeFetch(url, { minDelay: delay }); } catch (e) { console.error(`  [error] ${url}: ${e.message}`); continue; }
+        if (!res.ok || res.skippedReason) { console.error(`  [error] ${url}`); continue; }
+        const rec = parseTimesDetail(res.html, { url });
+        rec._requestUrl = url;
+        handleRecord(rec);
+        state[url] = now;
+      }
+      saveCrawlState(STATE.timesCrawlState, state);
+      continue;
+    }
+
     // ---- repark 個別物件 ----
     if (t.operator === "repark") {
       const url = reparkDetailUrl(t.parkId);
@@ -161,7 +201,7 @@ async function main() {
   }
 
   console.log(
-    `\n完了: ${stats.processed}物件処理 / 新規${stats.isNew} / 変動${stats.changed} / 追記${stats.written}行 → ${config.outFile}`
+    `\n完了: ${stats.processed}物件処理 / 新規${stats.isNew} / 変動${stats.changed} / 追記${stats.written}行 → ${process.env.OUT_FILE || config.outFile}`
   );
 }
 

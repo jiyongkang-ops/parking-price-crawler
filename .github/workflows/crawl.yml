@@ -29,6 +29,8 @@ jobs:
           node-version: "22"
       - run: npm ci
       - run: npm run crawl
+        env:
+          CRAWL_ONLY: "npc,repark" # タイムズは crawl-times.yml で別実行
       - name: commit data if changed
         run: |
           git config user.name "github-actions"
@@ -37,7 +39,8 @@ jobs:
           # 状態をコミットしないとローリングが毎回先頭に戻ってしまう。
           git add data/prices.jsonl data/repark-crawl-state.json data/repark-sitemap.xml
           if ! git diff --cached --quiet; then
-            git commit -m "chore: update parking data ($(date -u +%Y-%m-%dT%H:%MZ))"
+            git commit -m "chore: update npc+repark prices ($(date -u +%Y-%m-%dT%H:%MZ))"
+            git pull --rebase origin main
             git push
           else
             echo "変化なし。コミットしません。"

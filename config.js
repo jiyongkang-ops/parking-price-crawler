@@ -28,11 +28,21 @@ export const config = {
 
     // 三井のリパーク — 全国16,000件超を sitemap からローリング巡回（数日で1巡）
     { operator: "repark", mode: "nationwide", label: "repark全国" },
+
+    // タイムズ — 全国 約21,700件を sitemap からローリング巡回。
+    // ※先方が商用ボットを名指しブロックしているため、間隔を長め(timesMinDelayMs)に設定。
+    // ※ジョブ時間の都合で別ワークフロー(crawl-times.yml, CRAWL_ONLY=times)で実行。
+    { operator: "times", mode: "nationwide", label: "タイムズ全国" },
   ],
 
   // repark 全国ローリング巡回で、1回の実行で取得する最大件数。
   // 3000件 ≒ 1回 約3.3時間（4秒間隔）。1日3回で約9,000件/日 → 約2日で全国1巡。
   reparkRollingPerRun: 3000,
+
+  // タイムズ全国ローリング巡回（配慮して6秒間隔）。
+  // 3000件 ≒ 1回 約5時間。1日3回で約9,000件/日 → 約2.4日で全国1巡。
+  timesRollingPerRun: 3000,
+  timesMinDelayMs: 6000,
 
   // 全国規模では全件を毎回追記するとファイルが肥大するため、
   // 「新規 or 料金変動した物件のみ」追記する（時系列＝変化点の記録になる）。

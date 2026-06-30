@@ -77,8 +77,9 @@ function isAllowed(disallow, pathname) {
 }
 
 // 節度を守って 1 件取得する。
+// opts.minDelay でこの取得のアクセス間隔を上書き（事業者ごとの配慮に使う）。
 // 戻り値: { ok, status, html, skippedReason }
-export async function politeFetch(url) {
+export async function politeFetch(url, opts = {}) {
   const u = new URL(url);
   const origin = `${u.protocol}//${u.host}`;
 
@@ -88,8 +89,9 @@ export async function politeFetch(url) {
     return { ok: false, skippedReason: `robots.txt で Disallow: ${u.pathname}` };
   }
 
-  // 2) アクセス間隔の確保（直列・最低 minDelayMs）
-  const wait = config.minDelayMs - (Date.now() - lastRequestAt);
+  // 2) アクセス間隔の確保（直列・最低 minDelayMs、opts.minDelay があれば優先）
+  const minDelay = opts.minDelay ?? config.minDelayMs;
+  const wait = minDelay - (Date.now() - lastRequestAt);
   if (wait > 0) await sleep(wait);
 
   // 3) 取得
