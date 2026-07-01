@@ -7,6 +7,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { config } from "../config.js";
+import { normalizeFees } from "./normalize.js";
 
 const DATA_FILES = ["data/prices.jsonl", "data/prices-times.jsonl"];
 const OUT = "dashboard.html";
@@ -25,17 +26,9 @@ function loadRecords() {
   return recs;
 }
 
-// 円/時に正規化（代表として最初の時間帯単価を使う）
-function yenPerHour(rec) {
-  const u = (rec.unitCharges ?? [])[0];
-  if (!u || !u.perMinutes) return null;
-  return Math.round((u.amountYen / u.perMinutes) * 60);
-}
-
-// 代表的な最大料金（最安区分＝多くは24時間 or 夜間上限の最小値）
-function repMaxFee(rec) {
-  const fees = (rec.maxFees ?? []).map((m) => m.amountYen).filter((n) => n > 0);
-  return fees.length ? Math.min(...fees) : null;
+// 統一スキーマを利用（保存済みの fee を優先、無ければ read 時に正規化）
+function feeOf(rec) {
+  return rec.fee ?? normalizeFees(rec);
 }
 
 function prefOf(rec) {
@@ -60,16 +53,20 @@ function main() {
     .filter((r) => r.changedFromPrev)
     .sort((a, b) => new Date(b.fetchedAt) - new Date(a.fetchedAt));
 
-  // 各物件の集計用スリムデータ
-  const slim = lots.map((r) => ({
-    op: r.operator,
-    name: r.name,
-    pref: prefOf(r),
-    yph: yenPerHour(r),
-    max: repMaxFee(r),
-    lat: r.lat,
-    lng: r.lng,
-  }));
+  // 各物件の集計用スリムデータ（統一スキーマ）
+  const slim = lots.map((r) => {
+    const f = feeOf(r);
+    return {
+      op: r.operator,
+      name: r.name,
+      pref: prefOf(r),
+      yph: f.yph, // 円/時（代表）
+      max: f.max24h, // 24時間最大料金
+      night: f.maxNight, // 夜間最大
+      lat: r.lat,
+      lng: r.lng,
+    };
+  });
 
   const lastUpdated = all.reduce(
     (m, r) => (r.fetchedAt > m ? r.fetchedAt : m), ""
@@ -80,10 +77,11 @@ function main() {
     lastUpdated,
     operatorLabel: OPERATOR_LABEL,
     lots: slim,
-    changes: changes.map((r) => ({
-      op: r.operator, name: r.name, pref: prefOf(r),
-      yph: yenPerHour(r), max: repMaxFee(r), at: r.fetchedAt,
-    })),
+    changes: changes.map((r) => {
+      const f = feeOf(r);
+      return { op: r.operator, name: r.name, pref: prefOf(r),
+        yph: f.yph, max: f.max24h, at: r.fetchedAt };
+    }),
   };
 
   const html = render(payload);
@@ -131,6 +129,8 @@ function render(payload) {
   .bar-label{font-size:11px;fill:var(--muted)}
   input{background:#0d1117;border:1px solid var(--grid);color:var(--fg);
         border-radius:7px;padding:7px 10px;font-size:13px;width:220px}
+  #tbl{max-height:520px;overflow:auto;margin-top:10px}
+  #changes{max-height:360px;overflow:auto}
 </style></head><body>
 <header>
   <h1>🅿️ 駐車場料金ダッシュボード</h1>
@@ -141,7 +141,7 @@ function render(payload) {
   <div class="card col-6"><h2>事業者別 料金水準（中央値）</h2><div id="opcompare"></div></div>
   <div class="card col-6"><h2>時間単価の分布（円/時）</h2>
     <div class="legend" id="leg1"></div><div id="hist-yph"></div></div>
-  <div class="card col-6"><h2>最大料金の分布（円・最安区分）</h2>
+  <div class="card col-6"><h2>24時間最大料金の分布（円）</h2>
     <div class="legend" id="leg2"></div><div id="hist-max"></div></div>
   <div class="card col-6"><h2>都道府県別 物件数（上位15）</h2><div id="pref"></div></div>
   <div class="card col-6"><h2>地理分布（経度×緯度）</h2>
@@ -182,7 +182,7 @@ legend(document.getElementById('leg1')); legend(document.getElementById('leg2'))
   });
   const maxY = Math.max(...rows.map(r=>r.yph||0),1);
   const maxM = Math.max(...rows.map(r=>r.max||0),1);
-  let h='<table><tr><th>事業者</th><th class="num">円/時(中央値)</th><th class="num">最大料金(中央値)</th></tr>';
+  let h='<table><tr><th>事業者</th><th class="num">円/時(中央値)</th><th class="num">24時間最大(中央値)</th></tr>';
   rows.forEach(r=>{ h+='<tr><td><span class="dot" style="background:'+COL[r.op]+'"></span>'+LBL[r.op]+
     '</td><td class="num">'+fmt(r.yph)+'</td><td class="num">'+fmt(r.max)+'</td></tr>'; });
   h+='</table>';
@@ -254,7 +254,7 @@ histogram('hist-max','max',300,5000);
   const tbl=document.getElementById('tbl'), q=document.getElementById('q');
   function draw(f){
     const ls=D.lots.filter(l=>!f || (l.name||'').includes(f) || (l.pref||'').includes(f)).slice(0,300);
-    let h='<table><tr><th>事業者</th><th>都道府県</th><th>物件</th><th class="num">円/時</th><th class="num">最大料金</th></tr>';
+    let h='<table><tr><th>事業者</th><th>都道府県</th><th>物件</th><th class="num">円/時</th><th class="num">24時間最大</th></tr>';
     ls.forEach(l=>{ h+='<tr><td><span class="dot" style="background:'+COL[l.op]+'"></span>'+LBL[l.op]+
       '</td><td>'+l.pref+'</td><td>'+(l.name||'')+'</td><td class="num">'+fmt(l.yph)+'</td><td class="num">'+fmt(l.max)+'</td></tr>'; });
     h+='</table>'; if(D.lots.length>300) h+='<div class="empty">※先頭300件のみ表示。検索で絞り込めます</div>';
