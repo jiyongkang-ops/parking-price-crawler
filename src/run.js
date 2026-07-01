@@ -25,6 +25,7 @@ import { detailUrl as naviparkDetailUrl, parseNaviparkDetail } from "./navipark.
 import { getAllNaviparkCodes } from "./navipark-enumerate.js";
 import { detailUrl as ecoloDetailUrl, parseEcoloDetail } from "./ecolo.js";
 import { getAllEcoloIds } from "./ecolo-enumerate.js";
+import { searchUrl as theparkUrl, parseTheparkJson } from "./thepark.js";
 
 const STATE = {
   reparkSitemapCache: "data/repark-sitemap.xml",
@@ -275,6 +276,19 @@ async function main() {
         state[id] = now;
       }
       saveCrawlState(STATE.ecoloCrawlState, state);
+      continue;
+    }
+
+    // ---- ザ・パーク 全国（単一JSON一括） ----
+    if (t.operator === "thepark" && t.mode === "nationwide") {
+      const url = theparkUrl();
+      if (cachedRecently(url)) { console.log(`[cache] ザ・パーク全国 スキップ`); continue; }
+      let res;
+      try { res = await politeFetch(url); } catch (e) { console.error(`[error] ザ・パーク: ${e.message}`); continue; }
+      if (!res.ok || res.skippedReason) { console.error(`[error] ザ・パーク: ${res.skippedReason ?? "HTTP " + res.status}`); continue; }
+      const records = parseTheparkJson(res.html, { label: "ザ・パーク全国" });
+      records.forEach((r) => { r._requestUrl = url; handleRecord(r); });
+      console.log(`[ok] ザ・パーク全国 | ${records.length}物件`);
       continue;
     }
 

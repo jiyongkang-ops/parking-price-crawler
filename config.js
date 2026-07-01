@@ -45,6 +45,10 @@ export const config = {
     // エコロパーク(エコロシティ) — 約195エリアを辿って列挙・ローリング巡回。
     // ※別ワークフロー(crawl-ecolo.yml, CRAWL_ONLY=ecolo)で実行。
     { operator: "ecolo", mode: "nationwide", label: "エコロパーク全国" },
+
+    // ザ・パーク(第一興商) — 単一JSON(data/search.json)で全国 約3,367件を1リクエスト取得。
+    // ※別ワークフロー(crawl-others.yml に相乗り, CRAWL_ONLY に thepark を追加)で実行。
+    { operator: "thepark", mode: "nationwide", label: "ザ・パーク全国" },
   ],
 
   // repark 全国ローリング巡回で、1回の実行で取得する最大件数。

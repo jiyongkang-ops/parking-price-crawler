@@ -27,7 +27,7 @@ jobs:
       - run: npm ci
       - run: npm run crawl
         env:
-          CRAWL_ONLY: "mkp"
+          CRAWL_ONLY: "mkp,thepark" # 名鉄協商(ローリング) + ザ・パーク(単一JSON)
           OUT_FILE: "data/prices-others.jsonl"
       - name: commit data if changed
         run: |
