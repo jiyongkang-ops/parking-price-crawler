@@ -9,6 +9,7 @@ import { execFileSync } from "node:child_process";
 import { parseRecords } from "./parse-records.mjs";
 import { crawlerCompetitors, parkopediaCompetitors, recentPriceChanges } from "./competitors.mjs";
 import { renderReport } from "./report.mjs";
+import { staticMapDataUri } from "./map.mjs";
 
 const cfgPath = process.argv[2];
 if (!cfgPath) { console.error("使い方: node analyzer/analyze.mjs <config.json> [--pdf]"); process.exit(1); }
@@ -25,8 +26,10 @@ const pk = await parkopediaCompetitors({ lat: cfg.lat, lng: cfg.lng, radiusM });
 console.log(`[競合] Parkopedia: ${pk.available ? pk.count + "件" : "未使用/失敗"}`);
 const changes = recentPriceChanges({ lat: cfg.lat, lng: cfg.lng, radiusM: radiusM + 200 });
 console.log(`[変更] 周辺の最近の料金変更: ${changes.length}件`);
+const map = await staticMapDataUri({ target: { lat: cfg.lat, lng: cfg.lng }, competitors: comps });
+console.log(`[地図] ${map.dataUri ? "生成OK（マーカー" + map.marked.length + "件）" : "スキップ（GOOGLE_MAPS_KEY未設定 or 失敗" + (map.error ? ": " + map.error : "") + "）"}`);
 
-const html = renderReport(metrics, comps, cfg.current ?? {}, { address: cfg.address, genAt: new Date().toISOString(), changes });
+const html = renderReport(metrics, comps, cfg.current ?? {}, { address: cfg.address, genAt: new Date().toISOString(), changes, map });
 const out = path.resolve(cfg.out ?? `reports/${(metrics.parkName || "report").replace(/[\/\\]/g, "_")}.html`);
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, html);

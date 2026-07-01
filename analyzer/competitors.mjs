@@ -47,7 +47,7 @@ export function crawlerCompetitors({ lat, lng, radiusM = 400, dataDir = "data" }
       const u0 = (r.unitCharges ?? [])[0];
       return {
         source: "crawler", operator: r.operator, opLabel: OP_LABEL[r.operator] ?? r.operator,
-        name: r.name, address: r.address, dist: r.dist,
+        name: r.name, address: r.address, dist: r.dist, lat: r.lat, lng: r.lng,
         unit: u0 ? `${u0.perMinutes}分${u0.amountYen}円` : null,
         yph: fee.yph, nightMax: night, dayMax: day,
       };

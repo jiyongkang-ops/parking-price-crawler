@@ -52,6 +52,7 @@ export function buildRecommendations(metrics, comps, current) {
 
 export function renderReport(metrics, comps, current = {}, opts = {}) {
   const changes = opts.changes ?? [];
+  const map = opts.map ?? { dataUri: null, marked: [] };
   const { recs, impact, nightMed } = buildRecommendations(metrics, comps, current);
   const cap = metrics.capacity;
   const fmtDate = (d) => `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
@@ -72,6 +73,7 @@ export function renderReport(metrics, comps, current = {}, opts = {}) {
     spaceUse: metrics.spaceUse, feeTiers: metrics.feeTiers, maxTierCount: metrics.maxTierCount,
     nightRows, dayRows, recs,
     changes: changes.map((c) => ({ op: c.opLabel, name: c.name, dist: c.dist, at: c.at, night: c.fee?.max24h ?? null })),
+    map: map.dataUri ? { dataUri: map.dataUri, legend: map.marked.map((c, i) => ({ no: i + 1, name: (c.name || c.opLabel || "").replace(/駐車場$/, ""), dist: c.dist, night: c.nightMax ?? null })) } : null,
     genAt: opts.genAt ?? "",
   };
   return TEMPLATE.replace("/*__PAYLOAD__*/", JSON.stringify(payload).replace(/</g, "\\u003c"));
@@ -117,6 +119,7 @@ const TEMPLATE = `<title>駐車場 料金ご提案</title>
   </div>
   <div class="section"><div class="sec-h"><span class="no">02</span><h2>混雑時／閑散時、周辺より高いか安いか</h2></div>
     <p class="sec-sub">周辺駐車場（公開料金を調査）と、需要が高い夜間・低い日中で比較。</p>
+    <div class="card" id="map-card" style="display:none;margin-bottom:16px;"><p class="chart-t">周辺マップ（当駐車場と競合の位置）</p><div id="map-img"></div><div class="legend" id="map-legend" style="margin-top:10px;"></div></div>
     <div class="card"><p class="chart-t">夜間 最大料金の比較（当駐車場 vs 周辺）</p><div id="c-night"></div></div>
     <div class="card" style="margin-top:16px;overflow-x:auto;"><p class="chart-t">日中の料金比較</p><table><thead><tr><th>駐車場</th><th class="num">1時間</th><th class="num">3時間/日中最大</th></tr></thead><tbody id="tbl-day"></tbody></table></div>
   </div>
@@ -155,6 +158,8 @@ document.getElementById("tbl-day").innerHTML=D.dayRows.map(d=>'<tr class="'+(d.s
 document.getElementById("recs").innerHTML=D.recs.map((r,i)=>'<div class="rec"><div class="n '+r.kind+'">'+(i+1)+'</div><div><div class="t">'+r.t+'</div><div class="d">'+r.d+'</div>'+(r.move?'<div class="move">'+(r.move.old?'<span class="old">'+r.move.old+'</span> → ':'')+'<span class="new">'+r.move.new+'</span>'+(r.move.pill?'<span class="pill">'+r.move.pill+'</span>':'')+'</div>':'')+'</div></div>').join("");
 // インパクト
 document.getElementById("impact").innerHTML='<div style="font-size:12px;font-weight:700;color:var(--brand-dark)">推定インパクト</div><div class="big">月間売上 +'+yen(D.impact.lo)+'〜'+yen(D.impact.hi)+'（+'+upl[0]+'〜'+upl[1]+'%）</div>'+(D.unpaid.amount?'<div style="font-size:13px;color:var(--brand-dark);margin-top:4px">加えて未払い是正で最大 +'+yen(D.unpaid.amount)+'/月 の回収余地。</div>':'');
+// 周辺マップ
+if(D.map&&D.map.dataUri){const el=document.getElementById("map-card");el.style.display="";document.getElementById("map-img").innerHTML='<img src="'+D.map.dataUri+'" style="width:100%;border-radius:8px;border:1px solid var(--line);display:block" alt="周辺マップ">';document.getElementById("map-legend").innerHTML='<span><span class="dot" style="background:#009B3E"></span><b>P</b> 当駐車場</span>'+D.map.legend.map(l=>'<span><b>'+l.no+'.</b> '+l.name+(l.night?'（夜'+yen(l.night)+'）':'')+'</span>').join("");}
 // 周辺の最近の料金変更
 (function(){const el=document.getElementById("changes-card");if(!D.changes.length){el.innerHTML='<div style="color:var(--grey);font-size:13px">現時点で周辺の料金変更は検知されていません。<span style="color:var(--faint)">（周辺料金の継続収集により、変更が起きると自動で反映されます）</span></div>';return;}el.innerHTML='<table><thead><tr><th>日時</th><th>駐車場</th><th class="num">距離</th></tr></thead><tbody>'+D.changes.map(c=>'<tr><td>'+new Date(c.at).toLocaleDateString("ja-JP")+'</td><td>'+c.op+' '+(c.name||"")+'</td><td class="num">'+c.dist+'m</td></tr>').join("")+'</tbody></table>';})();
 </script>`;
