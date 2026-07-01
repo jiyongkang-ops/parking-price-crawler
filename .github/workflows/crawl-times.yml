@@ -37,7 +37,7 @@ jobs:
           git add data/prices-times.jsonl data/times-crawl-state.json data/times-park-urls.txt
           if ! git diff --cached --quiet; then
             git commit -m "chore: update times prices ($(date -u +%Y-%m-%dT%H:%MZ))"
-            git pull --rebase origin main
+            git pull --no-rebase --no-edit origin main
             git push
           else
             echo "変化なし。コミットしません。"
