@@ -23,6 +23,8 @@ import { detailUrl as mkpDetailUrl, parseMkpDetail } from "./mkp.js";
 import { getAllMkpIds } from "./mkp-enumerate.js";
 import { detailUrl as naviparkDetailUrl, parseNaviparkDetail } from "./navipark.js";
 import { getAllNaviparkCodes } from "./navipark-enumerate.js";
+import { detailUrl as ecoloDetailUrl, parseEcoloDetail } from "./ecolo.js";
+import { getAllEcoloIds } from "./ecolo-enumerate.js";
 
 const STATE = {
   reparkSitemapCache: "data/repark-sitemap.xml",
@@ -33,6 +35,8 @@ const STATE = {
   mkpCrawlState: "data/mkp-crawl-state.json",
   naviparkCodesCache: "data/navipark-codes.txt",
   naviparkCrawlState: "data/navipark-crawl-state.json",
+  ecoloIdsCache: "data/ecolo-ids.txt",
+  ecoloCrawlState: "data/ecolo-crawl-state.json",
 };
 
 function readLastSnapshots(file) {
@@ -244,6 +248,33 @@ async function main() {
         state[code] = now;
       }
       saveCrawlState(STATE.naviparkCrawlState, state);
+      continue;
+    }
+
+    // ---- エコロパーク 全国（ローリング巡回） ----
+    if (t.operator === "ecolo" && t.mode === "nationwide") {
+      let ids;
+      try {
+        ids = await getAllEcoloIds({ cacheFile: STATE.ecoloIdsCache, cacheMs: 7 * 864e5 });
+      } catch (e) { console.error(`[error] ecolo enumerate: ${e.message}`); continue; }
+      const state = loadCrawlState(STATE.ecoloCrawlState);
+      const perRun = config.ecoloRollingPerRun ?? 2500;
+      const batch = pickRolling(ids, state, perRun);
+      const visited = ids.filter((id) => state[id]).length;
+      console.log(
+        `[エコロ全国] 全${ids.length}件 / 既訪${visited}件 / 今回${batch.length}件取得。` +
+        `1巡目安: 約${Math.ceil(ids.length / perRun)}回実行`
+      );
+      for (const id of batch) {
+        let res;
+        try { res = await politeFetch(ecoloDetailUrl(id)); } catch (e) { console.error(`  [error] ${id}: ${e.message}`); continue; }
+        if (!res.ok || res.skippedReason) { console.error(`  [error] ${id}`); continue; }
+        const rec = parseEcoloDetail(res.html, { id });
+        rec._requestUrl = ecoloDetailUrl(id);
+        handleRecord(rec);
+        state[id] = now;
+      }
+      saveCrawlState(STATE.ecoloCrawlState, state);
       continue;
     }
 

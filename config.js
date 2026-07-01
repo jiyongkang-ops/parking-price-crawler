@@ -41,6 +41,10 @@ export const config = {
     // ナビパーク(スターツアメニティー) — エリア階層を辿って列挙・ローリング巡回。
     // ※別ワークフロー(crawl-navipark.yml, CRAWL_ONLY=navipark)で実行。
     { operator: "navipark", mode: "nationwide", label: "ナビパーク全国" },
+
+    // エコロパーク(エコロシティ) — 約195エリアを辿って列挙・ローリング巡回。
+    // ※別ワークフロー(crawl-ecolo.yml, CRAWL_ONLY=ecolo)で実行。
+    { operator: "ecolo", mode: "nationwide", label: "エコロパーク全国" },
   ],
 
   // repark 全国ローリング巡回で、1回の実行で取得する最大件数。
@@ -58,6 +62,9 @@ export const config = {
 
   // ナビパーク 全国ローリング巡回。4秒間隔。
   naviparkRollingPerRun: 2500,
+
+  // エコロパーク 全国ローリング巡回。4秒間隔。
+  ecoloRollingPerRun: 2500,
 
   // 全国規模では全件を毎回追記するとファイルが肥大するため、
   // 「新規 or 料金変動した物件のみ」追記する（時系列＝変化点の記録になる）。
