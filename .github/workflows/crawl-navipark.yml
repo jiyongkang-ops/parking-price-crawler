@@ -35,7 +35,7 @@ jobs:
           git add data/prices-navipark.jsonl data/navipark-crawl-state.json data/navipark-codes.txt
           if ! git diff --cached --quiet; then
             git commit -m "chore: update navipark prices ($(date -u +%Y-%m-%dT%H:%MZ))"
-            git pull --rebase origin main
+            git pull --no-rebase --no-edit origin main
             git push
           else
             echo "変化なし。コミットしません。"
