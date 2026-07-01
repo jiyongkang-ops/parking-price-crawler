@@ -1,17 +1,33 @@
-// 統一料金CSVの書き出し ---------------------------------------------------
-// data/*.jsonl の最新スナップショットを、事業者横断の統一スキーマで
-// data/parking-latest.csv に出力する（Excel等で横比較するため）。
+// 料金CSVの書き出し（生データ保持）-----------------------------------------
+// data/*.jsonl の最新スナップショットを data/parking-latest.csv に出力する。
+// 料金は円/時などに正規化せず、取得したままの生データを文字列で保持する。
+// （後で必要に応じて src/normalize.js 等で計算する前提）
 //
 //   node src/export-csv.js
 
 import fs from "node:fs";
 import path from "node:path";
-import { normalizeFees } from "./normalize.js";
 
 const DATA_FILES = ["data/prices.jsonl", "data/prices-times.jsonl"];
 const OUT = "data/parking-latest.csv";
 
 const OP = { npc: "NPC", repark: "三井のリパーク", times: "タイムズ" };
+
+// 生の時間帯単価を可読テキストに（計算はしない）
+// 例: "月～金 08:00-20:00 20分220円 ; 20:00-08:00 60分110円"
+function unitText(rec) {
+  return (rec.unitCharges ?? [])
+    .map((u) => [u.scope, u.timeRange, `${u.perMinutes}分${u.amountYen}円`].filter(Boolean).join(" "))
+    .join(" ; ");
+}
+
+// 生の最大料金を可読テキストに（計算・分類はしない）
+// 例: "全日 入庫後24時間以内 1400円 ; 全日 20:00～8:00以内 500円"
+function maxText(rec) {
+  return (rec.maxFees ?? [])
+    .map((m) => [m.scope, m.condition, `${m.amountYen}円`].filter(Boolean).join(" "))
+    .join(" ; ");
+}
 
 function loadLatest() {
   const latest = new Map();
@@ -38,15 +54,14 @@ function main() {
   const lots = loadLatest();
   const header = [
     "事業者", "物件名", "都道府県", "住所", "収容台数",
-    "円per時", "最大料金_24時間", "最大料金_夜間",
+    "時間帯料金(生)", "最大料金(生)", "営業時間", "満空",
     "緯度", "経度", "取得日時", "URL",
   ];
   const rows = lots.map((r) => {
-    const f = r.fee ?? normalizeFees(r);
     const pref = (r.address ?? "").match(/^(.+?[都道府県])/)?.[1] ?? "";
     return [
       OP[r.operator] ?? r.operator, r.name, pref, r.address, r.capacity,
-      f.yph, f.max24h, f.maxNight,
+      unitText(r), maxText(r), r.openingHours, r.fullEmptyStatus,
       r.lat, r.lng, r.fetchedAt, r.sourceUrl,
     ].map(csvCell).join(",");
   });

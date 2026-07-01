@@ -19,7 +19,6 @@ import {
 } from "./repark-enumerate.js";
 import { parseTimesDetail } from "./times.js";
 import { getAllParkUrls } from "./times-enumerate.js";
-import { normalizeFees } from "./normalize.js";
 
 const STATE = {
   reparkSitemapCache: "data/repark-sitemap.xml",
@@ -70,7 +69,8 @@ async function main() {
   // 1物件分の処理（差分検知＋追記）。
   function handleRecord(rec) {
     rec.fetchedAt = now;
-    rec.fee = normalizeFees(rec); // 事業者横断の統一料金スキーマ（比較用）
+    // 料金は生データ（unitCharges / maxFees）のまま保持する。
+    // 円/時や24時間最大などの正規化は保存せず、必要時に src/normalize.js で後計算する。
     const key = `${rec.operator}:${rec.parkId}`;
     const prev = last.get(key);
     const fp = feeFingerprint(rec);
