@@ -19,12 +19,16 @@ import {
 } from "./repark-enumerate.js";
 import { parseTimesDetail } from "./times.js";
 import { getAllParkUrls } from "./times-enumerate.js";
+import { detailUrl as mkpDetailUrl, parseMkpDetail } from "./mkp.js";
+import { getAllMkpIds } from "./mkp-enumerate.js";
 
 const STATE = {
   reparkSitemapCache: "data/repark-sitemap.xml",
   reparkCrawlState: "data/repark-crawl-state.json",
   timesUrlsCache: "data/times-park-urls.txt",
   timesCrawlState: "data/times-crawl-state.json",
+  mkpIdsCache: "data/mkp-ids.txt",
+  mkpCrawlState: "data/mkp-crawl-state.json",
 };
 
 function readLastSnapshots(file) {
@@ -182,6 +186,33 @@ async function main() {
         state[url] = now;
       }
       saveCrawlState(STATE.timesCrawlState, state);
+      continue;
+    }
+
+    // ---- 名鉄協商 全国（ローリング巡回） ----
+    if (t.operator === "mkp" && t.mode === "nationwide") {
+      let ids;
+      try {
+        ids = await getAllMkpIds({ cacheFile: STATE.mkpIdsCache, cacheMs: 7 * 864e5 });
+      } catch (e) { console.error(`[error] mkp sitemap: ${e.message}`); continue; }
+      const state = loadCrawlState(STATE.mkpCrawlState);
+      const perRun = config.mkpRollingPerRun ?? 2500;
+      const batch = pickRolling(ids, state, perRun);
+      const visited = ids.filter((id) => state[id]).length;
+      console.log(
+        `[名鉄協商全国] 全${ids.length}件 / 既訪${visited}件 / 今回${batch.length}件取得。` +
+        `1巡目安: 約${Math.ceil(ids.length / perRun)}回実行`
+      );
+      for (const id of batch) {
+        let res;
+        try { res = await politeFetch(mkpDetailUrl(id)); } catch (e) { console.error(`  [error] ${id}: ${e.message}`); continue; }
+        if (!res.ok || res.skippedReason) { console.error(`  [error] ${id}`); continue; }
+        const rec = parseMkpDetail(res.html, { id });
+        rec._requestUrl = mkpDetailUrl(id);
+        handleRecord(rec);
+        state[id] = now;
+      }
+      saveCrawlState(STATE.mkpCrawlState, state);
       continue;
     }
 

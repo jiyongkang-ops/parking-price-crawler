@@ -33,6 +33,10 @@ export const config = {
     // ※先方が商用ボットを名指しブロックしているため、間隔を長め(timesMinDelayMs)に設定。
     // ※ジョブ時間の都合で別ワークフロー(crawl-times.yml, CRAWL_ONLY=times)で実行。
     { operator: "times", mode: "nationwide", label: "タイムズ全国" },
+
+    // 名鉄協商 — 全国 約2,553件（sitemapはPC/SP両方を含むため実数は半分）。
+    // ※別ワークフロー(crawl-others.yml, CRAWL_ONLY=mkp)で実行。
+    { operator: "mkp", mode: "nationwide", label: "名鉄協商全国" },
   ],
 
   // repark 全国ローリング巡回で、1回の実行で取得する最大件数。
@@ -43,6 +47,10 @@ export const config = {
   // 3000件 ≒ 1回 約5時間。1日3回で約9,000件/日 → 約2.4日で全国1巡。
   timesRollingPerRun: 3000,
   timesMinDelayMs: 6000,
+
+  // 名鉄協商 全国ローリング巡回。約2,553件・4秒間隔。
+  // 2500件 ≒ 1回 約2.8時間。1日3回で全件を毎日カバー。
+  mkpRollingPerRun: 2500,
 
   // 全国規模では全件を毎回追記するとファイルが肥大するため、
   // 「新規 or 料金変動した物件のみ」追記する（時系列＝変化点の記録になる）。

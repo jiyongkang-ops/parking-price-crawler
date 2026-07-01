@@ -9,10 +9,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { config } from "../config.js";
 
-const DATA_FILES = ["data/prices.jsonl", "data/prices-times.jsonl"];
+const DATA_FILES = ["data/prices.jsonl", "data/prices-times.jsonl", "data/prices-others.jsonl"];
 const OUT = "dashboard.html";
 
-const OPERATOR_LABEL = { npc: "NPC", repark: "三井のリパーク", times: "タイムズ" };
+const OPERATOR_LABEL = { npc: "NPC", repark: "三井のリパーク", times: "タイムズ", mkp: "名鉄協商" };
 
 function loadRecords() {
   const recs = [];
@@ -92,7 +92,7 @@ function render(payload) {
 <title>駐車場料金ダッシュボード</title>
 <style>
   :root { --bg:#0f1419; --card:#1a2129; --fg:#e6edf3; --muted:#8b949e;
-          --npc:#3fb950; --repark:#58a6ff; --times:#f78166; --grid:#30363d; }
+          --npc:#3fb950; --repark:#58a6ff; --times:#f78166; --mkp:#d2a8ff; --grid:#30363d; }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--fg);
          font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif; }
@@ -139,7 +139,7 @@ function render(payload) {
 <script id="data" type="application/json">${JSON.stringify(payload).replace(/</g, "\\u003c")}</script>
 <script>
 const D = JSON.parse(document.getElementById('data').textContent);
-const COL = {npc:'var(--npc)',repark:'var(--repark)',times:'var(--times)'};
+const COL = {npc:'var(--npc)',repark:'var(--repark)',times:'var(--times)',mkp:'var(--mkp)'};
 const LBL = D.operatorLabel;
 const ops = [...new Set(D.lots.map(l=>l.op))];
 const fmt = n => n==null?'—':n.toLocaleString('ja-JP');
