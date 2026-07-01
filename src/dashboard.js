@@ -9,10 +9,17 @@ import fs from "node:fs";
 import path from "node:path";
 import { config } from "../config.js";
 
-const DATA_FILES = ["data/prices.jsonl", "data/prices-times.jsonl", "data/prices-others.jsonl"];
+// data/ 配下の prices*.jsonl を全て自動検出（事業者を増やしても変更不要）
+const DATA_FILES = fs
+  .readdirSync(path.resolve("data"))
+  .filter((f) => /^prices.*\.jsonl$/.test(f))
+  .map((f) => `data/${f}`);
 const OUT = "dashboard.html";
 
-const OPERATOR_LABEL = { npc: "NPC", repark: "三井のリパーク", times: "タイムズ", mkp: "名鉄協商" };
+const OPERATOR_LABEL = {
+  npc: "NPC", repark: "三井のリパーク", times: "タイムズ",
+  mkp: "名鉄協商", navipark: "ナビパーク", ecolo: "エコロパーク", thepark: "ザ・パーク",
+};
 
 function loadRecords() {
   const recs = [];
@@ -92,7 +99,8 @@ function render(payload) {
 <title>駐車場料金ダッシュボード</title>
 <style>
   :root { --bg:#0f1419; --card:#1a2129; --fg:#e6edf3; --muted:#8b949e;
-          --npc:#3fb950; --repark:#58a6ff; --times:#f78166; --mkp:#d2a8ff; --grid:#30363d; }
+          --npc:#3fb950; --repark:#58a6ff; --times:#f78166; --mkp:#d2a8ff;
+          --navipark:#ffa657; --ecolo:#79c0ff; --thepark:#ff7b72; --grid:#30363d; }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--fg);
          font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif; }
@@ -139,7 +147,7 @@ function render(payload) {
 <script id="data" type="application/json">${JSON.stringify(payload).replace(/</g, "\\u003c")}</script>
 <script>
 const D = JSON.parse(document.getElementById('data').textContent);
-const COL = {npc:'var(--npc)',repark:'var(--repark)',times:'var(--times)',mkp:'var(--mkp)'};
+const COL = {npc:'var(--npc)',repark:'var(--repark)',times:'var(--times)',mkp:'var(--mkp)',navipark:'var(--navipark)',ecolo:'var(--ecolo)',thepark:'var(--thepark)'};
 const LBL = D.operatorLabel;
 const ops = [...new Set(D.lots.map(l=>l.op))];
 const fmt = n => n==null?'—':n.toLocaleString('ja-JP');

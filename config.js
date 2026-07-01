@@ -37,6 +37,10 @@ export const config = {
     // 名鉄協商 — 全国 約2,553件（sitemapはPC/SP両方を含むため実数は半分）。
     // ※別ワークフロー(crawl-others.yml, CRAWL_ONLY=mkp)で実行。
     { operator: "mkp", mode: "nationwide", label: "名鉄協商全国" },
+
+    // ナビパーク(スターツアメニティー) — エリア階層を辿って列挙・ローリング巡回。
+    // ※別ワークフロー(crawl-navipark.yml, CRAWL_ONLY=navipark)で実行。
+    { operator: "navipark", mode: "nationwide", label: "ナビパーク全国" },
   ],
 
   // repark 全国ローリング巡回で、1回の実行で取得する最大件数。
@@ -51,6 +55,9 @@ export const config = {
   // 名鉄協商 全国ローリング巡回。約2,553件・4秒間隔。
   // 2500件 ≒ 1回 約2.8時間。1日3回で全件を毎日カバー。
   mkpRollingPerRun: 2500,
+
+  // ナビパーク 全国ローリング巡回。4秒間隔。
+  naviparkRollingPerRun: 2500,
 
   // 全国規模では全件を毎回追記するとファイルが肥大するため、
   // 「新規 or 料金変動した物件のみ」追記する（時系列＝変化点の記録になる）。

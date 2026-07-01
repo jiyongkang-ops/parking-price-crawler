@@ -8,10 +8,16 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const DATA_FILES = ["data/prices.jsonl", "data/prices-times.jsonl", "data/prices-others.jsonl"];
+const DATA_FILES = fs
+  .readdirSync(path.resolve("data"))
+  .filter((f) => /^prices.*\.jsonl$/.test(f))
+  .map((f) => `data/${f}`);
 const OUT = "data/parking-latest.csv";
 
-const OP = { npc: "NPC", repark: "三井のリパーク", times: "タイムズ", mkp: "名鉄協商" };
+const OP = {
+  npc: "NPC", repark: "三井のリパーク", times: "タイムズ",
+  mkp: "名鉄協商", navipark: "ナビパーク", ecolo: "エコロパーク", thepark: "ザ・パーク",
+};
 
 // 生の時間帯単価を可読テキストに（計算はしない）
 // 例: "月～金 08:00-20:00 20分220円 ; 20:00-08:00 60分110円"

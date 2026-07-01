@@ -21,6 +21,8 @@ import { parseTimesDetail } from "./times.js";
 import { getAllParkUrls } from "./times-enumerate.js";
 import { detailUrl as mkpDetailUrl, parseMkpDetail } from "./mkp.js";
 import { getAllMkpIds } from "./mkp-enumerate.js";
+import { detailUrl as naviparkDetailUrl, parseNaviparkDetail } from "./navipark.js";
+import { getAllNaviparkCodes } from "./navipark-enumerate.js";
 
 const STATE = {
   reparkSitemapCache: "data/repark-sitemap.xml",
@@ -29,6 +31,8 @@ const STATE = {
   timesCrawlState: "data/times-crawl-state.json",
   mkpIdsCache: "data/mkp-ids.txt",
   mkpCrawlState: "data/mkp-crawl-state.json",
+  naviparkCodesCache: "data/navipark-codes.txt",
+  naviparkCrawlState: "data/navipark-crawl-state.json",
 };
 
 function readLastSnapshots(file) {
@@ -213,6 +217,33 @@ async function main() {
         state[id] = now;
       }
       saveCrawlState(STATE.mkpCrawlState, state);
+      continue;
+    }
+
+    // ---- ナビパーク 全国（ローリング巡回） ----
+    if (t.operator === "navipark" && t.mode === "nationwide") {
+      let codes;
+      try {
+        codes = await getAllNaviparkCodes({ cacheFile: STATE.naviparkCodesCache, cacheMs: 7 * 864e5 });
+      } catch (e) { console.error(`[error] navipark enumerate: ${e.message}`); continue; }
+      const state = loadCrawlState(STATE.naviparkCrawlState);
+      const perRun = config.naviparkRollingPerRun ?? 2500;
+      const batch = pickRolling(codes, state, perRun);
+      const visited = codes.filter((c) => state[c]).length;
+      console.log(
+        `[ナビパーク全国] 全${codes.length}件 / 既訪${visited}件 / 今回${batch.length}件取得。` +
+        `1巡目安: 約${Math.ceil(codes.length / perRun)}回実行`
+      );
+      for (const code of batch) {
+        let res;
+        try { res = await politeFetch(naviparkDetailUrl(code)); } catch (e) { console.error(`  [error] ${code}: ${e.message}`); continue; }
+        if (!res.ok || res.skippedReason) { console.error(`  [error] ${code}`); continue; }
+        const rec = parseNaviparkDetail(res.html, { code });
+        rec._requestUrl = naviparkDetailUrl(code);
+        handleRecord(rec);
+        state[code] = now;
+      }
+      saveCrawlState(STATE.naviparkCrawlState, state);
       continue;
     }
 
