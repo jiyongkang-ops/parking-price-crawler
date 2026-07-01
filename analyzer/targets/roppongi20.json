@@ -1,0 +1,9 @@
+{
+  "csv": "/Users/kangjiyong/Downloads/利用状況レポート_エコロパーク+六本木第20_20260701.csv",
+  "address": "東京都港区六本木3-12",
+  "lat": 35.66246, "lng": 139.73570,
+  "capacity": 15,
+  "radiusM": 500,
+  "current": { "unit": "12分440円", "nightMax": 1300, "dayMax": 2800, "dayHour1": 2200 },
+  "out": "reports/roppongi20.html"
+}

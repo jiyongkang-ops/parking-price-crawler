@@ -6,7 +6,8 @@
   "scripts": {
     "crawl": "node src/run.js",
     "dashboard": "node src/dashboard.js",
-    "export": "node src/export-csv.js"
+    "export": "node src/export-csv.js",
+    "analyze": "node analyzer/analyze.mjs"
   },
   "dependencies": {
     "cheerio": "^1.0.0"
