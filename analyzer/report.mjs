@@ -129,7 +129,7 @@ export function renderReport(metrics, data, current = {}, opts = {}) {
     current, impact, nightTarget,
     occ: metrics.hourly.occWeekday, ent: metrics.hourly.entWeekday,
     spaceUse: metrics.spaceUse, maxTierCount: metrics.maxTierCount,
-    revBands: metrics.revenueBands, nightWindow: metrics.nightWindow, dow: metrics.dow, weekly: metrics.weekly, monthly: metrics.monthly, monthsSpan: metrics.monthsSpan, revenueMonthly: metrics.revenueMonthly,
+    revBands: metrics.revenueBands, nightWindow: metrics.nightWindow, dow: metrics.dow, weekly: metrics.weekly, monthly: metrics.monthly, monthsSpan: metrics.monthsSpan, revenueMonthly: metrics.revenueMonthly, spikeDays: metrics.spikeDays,
     plates: metrics.plates,
     nearest: nearest.map((c) => ({ name: c.name, op: c.opLabel, dist: c.dist, unit: c.unit, yph: c.yph })),
     nearestSource: data.nearestSource ?? "",
@@ -192,6 +192,7 @@ const TEMPLATE = `<title>駐車場 料金診断</title>
       <div class="legend"><span><span class="dot" style="background:var(--brand)"></span>稼働台数</span><span><span class="dot" style="background:var(--amber)"></span>入庫数</span></div></div>
     <div class="card" style="margin-top:12px;" id="weekly-card"><p class="chart-t">期間中の推移（週次）</p><p class="chart-c" id="weekly-c"></p><div id="c-weekly"></div>
       <div class="legend"><span><span class="dot" style="background:#009B3E"></span>売上</span><span><span class="dot" style="background:#D98200"></span>日次ピーク稼働の平均（台）</span></div></div>
+    <div class="card" style="margin-top:12px;" id="spike-card"><p class="chart-t">売上が急増した日（特異日）</p><p class="chart-c">同じ曜日の通常水準（中央値）の1.8倍以上だった日。<b>周辺イベント・催事等が背景にある可能性</b>があり、該当日の地域イベントを確認のうえ、イベント日の特別料金や満車対策の検討材料になる。</p><div id="c-spike" style="overflow-x:auto;"></div></div>
     <div class="grid k2" style="margin-top:12px;">
       <div class="card" id="space-card"><p class="chart-t">車室別 利用回数</p><div id="c-space"></div></div>
       <div class="card" id="fee-card"><p class="chart-t">料金階層の内訳</p><div id="c-fee"></div></div>
@@ -294,6 +295,13 @@ const py=v=>pT+ph*(1-Math.min(1,v/EFF));
 s2+='<polyline points="'+Wk.map((w,i)=>(bx(i)+bw/2)+","+py(w.peakAvg||0)).join(" ")+'" fill="none" stroke="#D98200" stroke-width="2.2"/>';
 Wk.forEach((w,i)=>{s2+='<circle cx="'+(bx(i)+bw/2)+'" cy="'+py(w.peakAvg||0)+'" r="3" fill="#D98200"/><text x="'+(bx(i)+bw/2+7)+'" y="'+(py(w.peakAvg||0)-6)+'" font-size="10" fill="#D98200" font-weight="700">'+(w.peakAvg==null?"":w.peakAvg+"台")+'</text>';});
 document.getElementById("c-weekly").innerHTML=s2+"</svg>";
+})();
+// 特異日（売上急増日）
+(function(){const S=D.spikeDays||[];const card=document.getElementById("spike-card");
+if(!S.length){if(card)card.style.display="none";return;}
+let h='<table style="font-size:12.5px;"><thead><tr><th>日付</th><th class="num">売上</th><th class="num">通常水準（同曜日）</th><th class="num">倍率</th><th class="num">入庫件数</th></tr></thead><tbody>';
+S.forEach(x=>{h+='<tr><td style="white-space:nowrap">'+esc(x.label)+'</td><td class="num" style="font-weight:700">'+yen(x.revenue)+'</td><td class="num" style="color:var(--grey)">'+yen(x.base)+'</td><td class="num" style="font-weight:800;color:var(--brand-dark)">x'+x.ratio+'</td><td class="num">'+x.count+'件</td></tr>';});
+document.getElementById("c-spike").innerHTML=h+'</tbody></table>';
 })();
 // 車室別（車室単位の記録がない場合＝ゲート式等は非表示）
 (function(){

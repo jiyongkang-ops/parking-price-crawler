@@ -190,6 +190,30 @@ export function parseRecords(csvPath, { capacity = null } = {}) {
   const revenueMonthly = Math.round(collected / Math.max(1, monthsSpan));
   const unpaidMonthly = Math.round(unpaidAmt / Math.max(1, monthsSpan));
 
+  // 特異日検知：日次売上を「同じ曜日の中央値」と比較し、急増日をピックアップ
+  const spikeDays = (() => {
+    const daily = new Map();
+    recs.forEach((r) => {
+      const k = `${r.in.getFullYear()}-${r.in.getMonth() + 1}-${r.in.getDate()}`;
+      const d = daily.get(k) ?? { date: new Date(r.in.getFullYear(), r.in.getMonth(), r.in.getDate()), revenue: 0, count: 0 };
+      d.revenue += r.paid; d.count++; daily.set(k, d);
+    });
+    const arr = [...daily.values()];
+    if (arr.length < 21) return []; // 3週間未満は判定しない
+    const medOf = (a) => { a = [...a].sort((x, y) => x - y); return a.length ? a[a.length >> 1] : 0; };
+    const dowMed = {};
+    for (let d = 0; d < 7; d++) dowMed[d] = medOf(arr.filter((x) => x.date.getDay() === d).map((x) => x.revenue));
+    const WD = ["日", "月", "火", "水", "木", "金", "土"];
+    return arr
+      .map((x) => ({ ...x, dow: WD[x.date.getDay()], base: dowMed[x.date.getDay()],
+        ratio: dowMed[x.date.getDay()] > 0 ? +(x.revenue / dowMed[x.date.getDay()]).toFixed(1) : null }))
+      .filter((x) => x.ratio != null && x.ratio >= 1.8 && x.revenue >= 3000)
+      .sort((a, b) => b.ratio - a.ratio)
+      .slice(0, 10)
+      .map((x) => ({ label: `${x.date.getFullYear()}/${x.date.getMonth() + 1}/${x.date.getDate()}（${x.dow}）`,
+        revenue: x.revenue, base: x.base, ratio: x.ratio, count: x.count }));
+  })();
+
   // ナンバー分析：未払い車両の特定は「直近のフル月」に限定し、
   // その中で「過去から直近月まで続いている車両（継続）」をピックアップする。
   const byPlate = new Map();
@@ -265,6 +289,6 @@ export function parseRecords(csvPath, { capacity = null } = {}) {
     feeTiers: Object.entries(feeCount).map(([f, c]) => ({ fee: +f, count: c })).sort((a, b) => a.fee - b.fee),
     maxTierCount,
     dayCurve,
-    revenueBands, nightWindow, dow, plates, weekly, monthly, monthsSpan, revenueMonthly,
+    revenueBands, nightWindow, dow, plates, weekly, monthly, monthsSpan, revenueMonthly, spikeDays,
   };
 }
