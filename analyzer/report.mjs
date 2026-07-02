@@ -122,10 +122,13 @@ const TEMPLATE = `<title>駐車場 料金診断</title>
   .tnum{font-variant-numeric:tabular-nums;} .wrap{max-width:940px;margin:0 auto;padding:0 20px 56px;}
   header{color:#fff;padding:32px 0 28px;margin-bottom:24px;background:linear-gradient(135deg,#00622A,#009B3E);}
   header .wrap{padding-bottom:0;} header h1{font-size:25px;font-weight:800;margin:0;letter-spacing:-.01em;line-height:1.25;}
-  .h1sub{font-size:16px;font-weight:700;opacity:.92;margin:4px 0 0;} header .meta{font-size:13px;opacity:.92;display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;} header .meta b{font-weight:700;}
+  .h1sub{font-size:16px;font-weight:700;opacity:.92;margin:4px 0 0;}
+  .logo{margin-bottom:16px;} .logo svg{height:18px;width:auto;display:block;} .logo path,.logo polygon{fill:#fff;} .logo .lg2{fill:rgba(255,255,255,.82);}
+  .ic{width:14px;height:14px;vertical-align:-2px;margin-right:5px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:inline-block;}
+  .em svg{width:20px;height:20px;stroke:var(--brand-dark);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;} header .meta{font-size:13px;opacity:.92;display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;} header .meta b{font-weight:700;}
   .section{margin-top:28px;} .sec-h{display:flex;align-items:baseline;gap:12px;margin:0 0 4px;} .sec-h .no{color:var(--brand);font-weight:800;font-size:14px;} .sec-h h2{font-size:19px;font-weight:800;margin:0;}
   .sec-sub{color:var(--grey);font-size:13.5px;margin:2px 0 16px;padding-left:26px;}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px 22px;box-shadow:0 1px 2px rgba(0,0,0,.03);}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:20px 22px;box-shadow:0 1px 2px rgba(0,0,0,.03);}
   .grid{display:grid;gap:16px;} .k4{grid-template-columns:repeat(4,1fr);} .k2{grid-template-columns:1fr 1fr;}
   @media(max-width:720px){.k4{grid-template-columns:1fr 1fr;}.k2{grid-template-columns:1fr;}}
   .kpi{display:flex;flex-direction:column;} .kpi .lbl{font-size:11.5px;color:var(--grey);font-weight:700;white-space:nowrap;} .kpi .val{font-size:24px;font-weight:800;margin-top:5px;white-space:nowrap;letter-spacing:-.01em;} .kpi .val small{font-size:13px;color:var(--grey);font-weight:700;} .kpi .sub{font-size:11.5px;color:var(--faint);margin-top:auto;padding-top:6px;} .kpi.accent{border-left:3px solid var(--brand);}
@@ -133,16 +136,16 @@ const TEMPLATE = `<title>駐車場 料金診断</title>
   .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--grey);margin-top:10px;} .legend span{display:inline-flex;align-items:center;gap:6px;} .dot{width:11px;height:11px;border-radius:3px;display:inline-block;}
   table{border-collapse:collapse;width:100%;font-size:13px;} th,td{padding:9px 11px;border-bottom:1px solid var(--line-soft);text-align:left;} th{font-size:11.5px;color:var(--grey);font-weight:700;background:#F0F2F0;} td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;} tr.hot td{background:var(--amber-bg);}
   .tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:5px;background:#EEF1EE;color:#3d7a1f;white-space:nowrap;}
-  .rec{display:flex;gap:16px;align-items:flex-start;padding:16px 0;border-bottom:1px solid var(--line-soft);} .rec:last-child{border-bottom:none;} .rec .n{flex:0 0 30px;height:30px;border-radius:8px;color:#fff;display:grid;place-items:center;font-weight:800;} .rec .n.g{background:var(--brand);} .rec .n.a{background:var(--amber);} .rec .t{font-weight:700;font-size:15px;} .rec .d{color:var(--grey);font-size:13px;margin-top:3px;}
-  .move{margin-top:6px;font-weight:800;font-variant-numeric:tabular-nums;} .move .old{color:var(--faint);text-decoration:line-through;} .move .new{color:var(--brand-dark);} .move .pill{background:var(--brand-light);color:var(--brand-dark);border-radius:999px;padding:1px 9px;font-size:12px;margin-left:6px;}
-  .callout{background:var(--brand-light);border:1px solid #B7E3C7;border-radius:12px;padding:18px 20px;margin-top:16px;} .callout .big{font-size:26px;font-weight:800;color:var(--brand-dark);}
-  .flag{background:var(--brand-light);border:1px solid #B7E3C7;border-radius:12px;padding:16px 20px;margin-bottom:16px;display:flex;gap:14px;} .flag .em{font-size:22px;} .flag .t{font-weight:800;font-size:15px;color:var(--brand-dark);} .flag .d{font-size:13px;color:var(--brand-dark);margin-top:2px;}
+  .rec{display:flex;gap:16px;align-items:flex-start;padding:16px 0;border-bottom:1px solid var(--line-soft);} .rec:last-child{border-bottom:none;} .rec .n{flex:0 0 30px;height:30px;border-radius:6px;color:#fff;display:grid;place-items:center;font-weight:800;} .rec .n.g{background:var(--brand);} .rec .n.a{background:var(--amber);} .rec .t{font-weight:700;font-size:15px;} .rec .d{color:var(--grey);font-size:13px;margin-top:3px;}
+  .move{margin-top:6px;font-weight:800;font-variant-numeric:tabular-nums;} .move .old{color:var(--faint);text-decoration:line-through;} .move .new{color:var(--brand-dark);} .move .pill{background:var(--brand-light);color:var(--brand-dark);border-radius:4px;padding:1px 8px;font-size:12px;margin-left:6px;}
+  .callout{background:var(--brand-light);border:1px solid #B7E3C7;border-radius:8px;padding:18px 20px;margin-top:16px;} .callout .big{font-size:26px;font-weight:800;color:var(--brand-dark);}
+  .flag{background:var(--brand-light);border:1px solid #B7E3C7;border-radius:8px;padding:16px 20px;margin-bottom:16px;display:flex;gap:14px;} .flag .em{font-size:22px;} .flag .t{font-weight:800;font-size:15px;color:var(--brand-dark);} .flag .d{font-size:13px;color:var(--brand-dark);margin-top:2px;}
   .unpaid-card{border-left:3px solid var(--amber);} .unpaid-card .chart-t{color:#9A5B00;}
   .hbar{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:12px;} .hbar .l{width:92px;color:var(--grey);} .hbar .track{flex:1;background:#EEF1EE;border-radius:4px;} .hbar .fill{height:14px;border-radius:4px;} .hbar .v{width:150px;text-align:right;font-variant-numeric:tabular-nums;}
   svg{display:block;width:100%;height:auto;overflow:visible;}
   @media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}body{background:#fff;}.card,.kpi,.callout,.flag,.rec{break-inside:avoid;}.section{break-inside:avoid-page;}}
 </style>
-<header><div class="wrap"><h1 id="h1"></h1><div class="h1sub">売上最大化のための料金診断</div><div class="meta" id="meta"></div></div></header>
+<header><div class="wrap"><div class="logo"><svg viewBox="0 0 463.09 58.97" xmlns="http://www.w3.org/2000/svg" aria-label="AIMO Parking"><path d="M119.47,47.76l-2.12-5.66h-14.04l-2.24,5.66h-11.74l16.61-38.05h8.66l16.61,38.05h-11.74ZM110.55,24.14l-4.1,10.15h7.95l-3.85-10.15Z"/><path d="M138.52,47.76V9.71h11.22v38.05h-11.22Z"/><path d="M192.08,47.76v-18.22l-6.48,9.41h-7.18l-6.48-9.41v18.22h-11.22V9.71h11.03l10.26,16.78,10.26-16.78h11.03v38.05h-11.22Z"/><path d="M243.23,43.81c-3.33,2.78-7.18,4.28-12.76,4.28s-9.43-1.5-12.76-4.28c-4.81-4.01-4.62-9.35-4.62-15.07s-.19-11.06,4.62-15.07c3.33-2.78,7.18-4.28,12.76-4.28s9.43,1.5,12.76,4.28c4.81,4.01,4.62,9.35,4.62,15.07s.19,11.06-4.62,15.07ZM234.96,19.38c-.83-.91-2.44-1.66-4.49-1.66s-3.66.75-4.49,1.66c-1.03,1.12-1.67,2.41-1.67,9.35s.64,8.18,1.67,9.3c.83.91,2.44,1.71,4.49,1.71s3.66-.8,4.49-1.71c1.03-1.12,1.67-2.35,1.67-9.3s-.64-8.23-1.67-9.35Z"/><polygon points="80.79 57.47 0 57.47 0 0 80.37 0 80.37 9.71 9.71 9.71 9.71 47.76 80.79 47.76 80.79 57.47"/><path d="M57.44,28.52c0,8.07-6.55,14.62-14.62,14.62s-14.62-6.55-14.62-14.62,6.55-14.62,14.62-14.62,14.62,6.55,14.62,14.62ZM41.92,25.94v-5.42c0-.67-.55-1.23-1.23-1.23h-5.42c-.67,0-1.23.55-1.23,1.23v5.42c0,.67.55,1.23,1.23,1.23h5.42c.67,0,1.23-.55,1.23-1.23Z"/><path class="lg2" d="M272.61,48.08c-.34,0-.57-.23-.57-.57V10.08c0-.34.23-.57.57-.57h15.42c9.41,0,14.29,5.33,14.29,12.82s-4.93,12.87-14.29,12.87h-5.67c-.23,0-.34.11-.34.34v11.97c0,.34-.23.57-.57.57h-8.85ZM292.35,22.33c0-2.66-1.76-4.37-4.87-4.37h-5.1c-.23,0-.34.11-.34.34v8.11c0,.23.11.34.34.34h5.1c3.12,0,4.87-1.76,4.87-4.42Z"/><path class="lg2" d="M321.44,48.08c-.34,0-.57-.23-.57-.57v-1.59h-.06c-1.47,1.7-3.8,2.84-7.43,2.84-4.71,0-8.96-2.55-8.96-8.51s4.87-9.07,11.74-9.07h4.37c.23,0,.34-.11.34-.34v-.74c0-2.04-1.08-2.89-5.33-2.89-2.49,0-4.65.68-5.95,1.59-.29.17-.57.17-.74-.17l-2.95-5.22c-.17-.4-.11-.68.17-.91,2.49-1.7,6.18-2.72,10.72-2.72,9.64,0,13.04,3.23,13.04,10.32v17.41c0,.34-.23.57-.57.57h-7.83ZM320.87,39.01v-1.7c0-.23-.11-.34-.34-.34h-3.35c-2.55,0-3.86.91-3.86,2.61,0,1.53,1.08,2.38,3.23,2.38,2.95,0,4.31-.96,4.31-2.95Z"/><path class="lg2" d="M336.24,48.08c-.34,0-.57-.23-.57-.57v-26.48c0-.34.23-.57.57-.57h8.39c.34,0,.57.23.57.57v2.44h.06c1.3-2.44,3.91-3.69,7.15-3.69,1.53,0,2.95.4,3.8,1.08.34.17.4.34.29.74l-3.23,8c-.23.28-.45.23-.79.06-1.36-.85-2.72-1.25-4.02-1.08-2.21.17-3.23,1.87-3.23,4.82v14.12c0,.34-.23.57-.57.57h-8.39Z"/><path class="lg2" d="M377.75,48.08c-.4,0-.68-.17-.85-.57l-5.39-10.66-2.04,2.72v7.94c0,.34-.23.57-.57.57h-8.33c-.34,0-.57-.23-.57-.57V10.08c0-.34.23-.57.57-.57h8.33c.34,0,.57.23.57.57v19.4l6.47-8.45c.34-.4.62-.57,1.08-.57h8.68c.34,0,.45.34.23.57l-8.11,9.41,9.24,17.07c.17.28.06.57-.28.57h-9.02Z"/><path class="lg2" d="M391.19,16.89c-.34,0-.57-.23-.57-.57v-6.24c0-.34.23-.57.57-.57h8.39c.34,0,.57.23.57.57v6.24c0,.34-.23.57-.57.57h-8.39ZM391.19,48.08c-.34,0-.57-.23-.57-.57v-26.48c0-.34.23-.57.57-.57h8.39c.34,0,.57.23.57.57v26.48c0,.34-.23.57-.57.57h-8.39Z"/><path class="lg2" d="M423,48.08c-.34,0-.56-.23-.56-.57v-15.76c0-2.44-1.08-4.03-3.35-4.03s-3.4,1.53-3.4,4.03v15.76c0,.34-.23.57-.57.57h-8.39c-.34,0-.57-.23-.57-.57v-26.48c0-.34.23-.57.57-.57h8.39c.34,0,.57.23.57.57v1.99h.06c1.25-1.81,3.63-3.23,7.09-3.23,6.3,0,9.13,4.25,9.13,10.32v17.41c0,.34-.23.57-.57.57h-8.39Z"/><path class="lg2" d="M437.57,54.66c-.23-.28-.17-.57.06-.85l4.76-4.88c.29-.28.57-.28.85,0,1.64,1.36,3.29,2.21,5.44,2.21,3.4,0,4.88-1.76,4.88-5.61v-2.1h-.06c-1.19,1.99-3.63,3.23-7.03,3.23-4.54,0-7.65-2.27-9.07-6.63-.62-1.87-.91-3.91-.91-6.81s.29-4.88.91-6.81c1.42-4.31,4.54-6.63,9.07-6.63,3.4,0,5.84,1.3,7.03,3.29h.06v-2.04c0-.34.23-.57.57-.57h8.39c.34,0,.57.23.57.57v22.8c0,10.66-5.1,15.14-14.69,15.14-4.37,0-8.91-1.98-10.83-4.31ZM453.17,36.45c.23-.79.4-1.65.4-3.23s-.17-2.44-.4-3.23c-.51-1.59-1.53-2.38-3.34-2.38s-2.78.79-3.29,2.38c-.28.79-.4,1.7-.4,3.23s.11,2.44.4,3.23c.51,1.65,1.53,2.44,3.29,2.44s2.84-.79,3.34-2.44Z"/></svg></div><h1 id="h1"></h1><div class="h1sub">売上最大化のための料金診断</div><div class="meta" id="meta"></div></div></header>
 <div class="wrap">
   <div class="grid k4" style="margin-bottom:16px;" id="kpis"></div>
   <div class="flag" id="flag" style="display:none;"></div>
@@ -185,12 +188,18 @@ const D=JSON.parse(document.getElementById("d").textContent);
 const yen=n=>n==null?"—":"¥"+Number(n).toLocaleString("ja-JP");
 const esc=s=>(s==null?"":String(s)).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 const EFF=D.cap.effective;
+const IC={
+ pin:'<svg class="ic" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>',
+ car:'<svg class="ic" viewBox="0 0 24 24"><path d="M5 16l1.6-5.4A2 2 0 0 1 8.5 9h7a2 2 0 0 1 1.9 1.6L19 16"/><rect x="4" y="15" width="16" height="4" rx="1.5"/><circle cx="8" cy="19" r="1"/><circle cx="16" cy="19" r="1"/></svg>',
+ cal:'<svg class="ic" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg>',
+ card:'<svg class="ic" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg>',
+};
 document.getElementById("h1").textContent=D.park;
 document.getElementById("meta").innerHTML=[
- D.address&&"📍 <b>"+esc(D.address)+"</b>",
- "🚗 <b>実効"+EFF+"車室"+(D.cap.blocked.length?"（"+D.cap.blocked.join("・")+"は封鎖）":"")+"</b>",
- "📅 <b>"+D.period+"</b>（"+D.sessions.toLocaleString()+"回駐車）",
- D.current.unit&&"💳 現行 <b>"+esc(D.current.unit)+(D.current.nightMax?" / 夜間最大"+yen(D.current.nightMax):"")+"</b>",
+ D.address&&IC.pin+"<b>"+esc(D.address)+"</b>",
+ IC.car+"<b>実効"+EFF+"車室"+(D.cap.blocked.length?"（"+D.cap.blocked.join("・")+"は封鎖）":"")+"</b>",
+ IC.cal+"<b>"+D.period+"</b>（"+D.sessions.toLocaleString()+"回駐車）",
+ D.current.unit&&IC.card+"現行 <b>"+esc(D.current.unit)+(D.current.nightMax?" / 夜間最大"+yen(D.current.nightMax):"")+"</b>",
 ].filter(Boolean).join("");
 // KPI
 const up=D.impact.pct;
@@ -203,7 +212,7 @@ document.getElementById("kpis").innerHTML=[
 // flag
 if(D.cap.blocked.length&&D.peak.fullNights/Math.max(1,D.peak.nights)>=0.5){
   const f=document.getElementById("flag");f.style.display="";
-  f.innerHTML='<div class="em">📌</div><div><div class="t">前提：車室'+D.cap.blocked.join("・")+'は封鎖。実効キャパ'+EFF+'台が上限。</div><div class="d"><b>'+EFF+'台がフル稼働の上限</b>。夜間ピークは'+D.peak.nights+'夜中'+D.peak.fullNights+'夜が満車。供給を増やせない以上、ピーク時に売上を伸ばす手段は<b>価格</b>。</div></div>';
+  f.innerHTML='<div class="em"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4.5"/><path d="M12 15.8h.01"/></svg></div><div><div class="t">前提：車室'+D.cap.blocked.join("・")+'は封鎖。実効キャパ'+EFF+'台が上限。</div><div class="d"><b>'+EFF+'台がフル稼働の上限</b>。夜間ピークは'+D.peak.nights+'夜中'+D.peak.fullNights+'夜が満車。供給を増やせない以上、ピーク時に売上を伸ばす手段は<b>価格</b>。</div></div>';
 }
 // 稼働×入庫
 (function(){const O=D.occ,E=D.ent,W=880,H=240,pL=34,pB=26,pT=10,pw=W-pL-20,ph=H-pB-pT;
@@ -267,7 +276,7 @@ h+='<tr><td>期間内の支払い履歴なし</td><td class="num">'+(P.neverPaid
 el.innerHTML=h;})();
 // 周辺マップ
 if(D.map&&D.map.dataUri){const el=document.getElementById("map-card");el.style.display="";
- document.getElementById("map-img").innerHTML='<img src="'+D.map.dataUri+'" style="width:100%;border-radius:8px;border:1px solid var(--line);display:block" alt="周辺マップ">';
+ document.getElementById("map-img").innerHTML='<img src="'+D.map.dataUri+'" style="width:100%;border-radius:6px;border:1px solid var(--line);display:block" alt="周辺マップ">';
  document.getElementById("map-legend").innerHTML='<span><span class="dot" style="background:#009B3E"></span><b>P</b> 当駐車場</span>'+D.map.legend.map(l=>'<span><b>'+l.no+'.</b> '+esc(l.name)+(l.yph?'（'+yen(l.yph)+'/時）':'')+'</span>').join("");}
 // 最寄り比較
 (function(){const N=D.nearest||[];if(!N.length)return;
@@ -277,7 +286,7 @@ const med=(a=>{a=a.filter(x=>x!=null).sort((x,y)=>x-y);return a.length?a[a.lengt
 const pos=med==null||selfY==null?"":(selfY>med?"high":(selfY<med?"low":"mid"));
 document.getElementById("nearest-c").innerHTML=selfY?('当駐車場の<b>'+yen(selfY)+'/時は'+(pos==="high"?'近隣で最高水準':pos==="low"?'近隣で安い水準':'近隣中央値並み')+'</b>（周辺中央値 約'+yen(med)+'/時）。'):'';
 let rows='';
-if(selfY)rows+='<tr class="hot"><td class="num">—</td><td style="font-weight:800">当駐車場（'+esc(D.park)+'）</td><td><span class="tag">自駐車場</span></td><td class="num">'+esc(D.current.unit||"")+'</td><td class="num" style="font-weight:800;color:'+(pos==="high"?"#D0433A":"#00622A")+'">'+yen(selfY)+(pos==="high"?' ⚠最高':'')+'</td></tr>';
+if(selfY)rows+='<tr class="hot"><td class="num">—</td><td style="font-weight:800">当駐車場（'+esc(D.park)+'）</td><td><span class="tag">自駐車場</span></td><td class="num">'+esc(D.current.unit||"")+'</td><td class="num" style="font-weight:800;color:'+(pos==="high"?"#D0433A":"#00622A")+'">'+yen(selfY)+(pos==="high"?'（最高）':'')+'</td></tr>';
 N.forEach(c=>{rows+='<tr><td class="num">'+(c.dist!=null?c.dist+'m':'—')+'</td><td>'+esc(c.name)+'</td><td><span class="tag">'+esc(c.op)+'</span></td><td class="num">'+esc(c.unit||"—")+'</td><td class="num">'+yen(c.yph)+'</td></tr>';});
 document.getElementById("tbl-nearest").innerHTML=rows;})();
 // 夜間最大比較
