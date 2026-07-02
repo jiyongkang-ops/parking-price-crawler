@@ -359,11 +359,14 @@ if(D.map&&D.map.dataUri){const el=document.getElementById("map-card");el.style.d
 document.getElementById("nearest-card").style.display="";
 const selfY=D.current.dayHour1;
 const med=(a=>{a=a.filter(x=>x!=null).sort((x,y)=>x-y);return a.length?a[a.length>>1]:null})(N.map(c=>c.yph));
-const pos=med==null||selfY==null?"":(selfY>med?"high":(selfY<med?"low":"mid"));
-document.getElementById("nearest-c").innerHTML=selfY?('当駐車場の<b>'+yen(selfY)+'/時は'+(pos==="high"?'近隣で最高水準':pos==="low"?'近隣で安い水準':'近隣中央値並み')+'</b>（周辺中央値 約'+yen(med)+'/時）。'):'';
+const vals=N.map(c=>c.yph).filter(x=>x!=null);const mx=vals.length?Math.max(...vals):null;
+const pos=(med==null||selfY==null)?"":(mx!=null&&selfY>=mx?"highest":selfY>med?"above":selfY<med?"below":"mid");
+const posTxt={highest:"近隣で最高水準",above:"周辺中央値より高め",below:"周辺より安い水準",mid:"周辺中央値並み"}[pos]||"近隣比較";
+const posCol={highest:"#D0433A",above:"#1B1E1C",below:"#00622A",mid:"#1B1E1C"}[pos]||"#1B1E1C";
+document.getElementById("nearest-c").innerHTML=selfY?('当駐車場の<b>'+yen(selfY)+'/時は'+posTxt+'</b>（周辺中央値 約'+yen(med)+'/時・最高 '+yen(mx)+'/時）。'):'';
 let rows='';
-if(selfY)rows+='<tr class="hot"><td class="num">—</td><td style="font-weight:800">当駐車場（'+esc(D.park)+'）</td><td><span class="tag">自駐車場</span></td><td class="num">'+esc(D.current.unit||"")+'</td><td class="num" style="font-weight:800;color:'+(pos==="high"?"#D0433A":"#00622A")+'">'+yen(selfY)+(pos==="high"?'（最高）':'')+'</td></tr>';
-N.forEach(c=>{rows+='<tr><td class="num">'+(c.dist!=null?c.dist+'m':'—')+'</td><td>'+esc(c.name)+'</td><td><span class="tag">'+esc(c.op)+'</span></td><td class="num">'+esc(c.unit||"—")+'</td><td class="num">'+yen(c.yph)+'</td></tr>';});
+if(selfY)rows+='<tr class="hot"><td class="num">—</td><td style="font-weight:800">当駐車場（'+esc(D.park)+'）</td><td><span class="tag">自駐車場</span></td><td class="num" style="white-space:nowrap">'+esc(D.current.unit||"")+'</td><td class="num" style="font-weight:800;white-space:nowrap;color:'+posCol+'">'+yen(selfY)+(pos==="highest"?'（最高）':'')+'</td></tr>';
+N.forEach(c=>{rows+='<tr><td class="num">'+(c.dist!=null?c.dist+'m':'—')+'</td><td>'+esc(c.name)+'</td><td><span class="tag">'+esc(c.op)+'</span></td><td class="num" style="white-space:nowrap">'+esc(c.unit||"—")+'</td><td class="num" style="white-space:nowrap">'+yen(c.yph)+'</td></tr>';});
 document.getElementById("tbl-nearest").innerHTML=rows;})();
 // 夜間最大比較
 (function(){const rows=[...(D.nightRows||[])].sort((a,b)=>b.v-a.v);if(rows.length<2)return;
@@ -408,7 +411,9 @@ document.getElementById("concl-1").innerHTML=c1;
 const N=D.nearest||[];const selfY=D.current.dayHour1;
 const med=(a=>{a=a.filter(x=>x!=null).sort((x,y)=>x-y);return a.length?a[a.length>>1]:null})(N.map(c=>c.yph));
 let c2parts=[];
-if(selfY&&med)c2parts.push(selfY>med?'単価'+yen(selfY)+'/時は<b>近隣で最高水準</b>（中央値 約'+yen(med)+'/時）':selfY<med?'単価'+yen(selfY)+'/時は<b>周辺より安い水準</b>（中央値 約'+yen(med)+'/時）':'単価は周辺中央値並み');
+const vals2=N.map(c=>c.yph).filter(x=>x!=null);const mx2=vals2.length?Math.max(...vals2):null;
+if(selfY&&med){const p2=(mx2!=null&&selfY>=mx2)?"highest":selfY>med?"above":selfY<med?"below":"mid";
+c2parts.push('単価'+yen(selfY)+'/時は<b>'+({highest:"近隣で最高水準",above:"周辺中央値より高め",below:"周辺より安い水準",mid:"周辺中央値並み"}[p2])+'</b>（中央値 約'+yen(med)+'/時）');}
 const nr=D.nightRows||[];const selfN=nr.find(r=>r.self);
 if(selfN&&nr.length>1){const others=nr.filter(r=>!r.self).map(r=>r.v);if(selfN.v<=Math.min(...others))c2parts.push('夜間最大'+yen(selfN.v)+'は<b>周辺最安</b>');else if(selfN.v>=Math.max(...others))c2parts.push('夜間最大'+yen(selfN.v)+'は周辺最高');}
 document.getElementById("concl-2").innerHTML='<b>結論：</b>'+(c2parts.length?c2parts.join("。")+"。":"周辺比較は下表参照。");
