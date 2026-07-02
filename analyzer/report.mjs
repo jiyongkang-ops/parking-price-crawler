@@ -12,6 +12,8 @@ const yen = (n) => (n == null ? "—" : "¥" + Number(n).toLocaleString("ja-JP")
 const median = (a) => { a = a.filter((x) => x != null).sort((x, y) => x - y); return a.length ? a[a.length >> 1] : null; };
 
 export function buildRecommendations(metrics, nightComps, nearest, current) {
+  const mRev = metrics.revenueMonthly ?? metrics.revenue;
+  const uAmt = metrics.unpaid.amountMonthly ?? metrics.unpaid.amount;
   const nightMed = median(nightComps.map((c) => c.nightMax));
   const dayMedComp = median(nightComps.map((c) => c.dayMax));
   const nearestYphMed = median(nearest.filter((c) => !c.self).map((c) => c.yph));
@@ -32,7 +34,7 @@ export function buildRecommendations(metrics, nightComps, nearest, current) {
     const upRate = (target - current.nightMax) / current.nightMax;
     recs.push({ kind: "g", t: "夜間の時間帯最大を引き上げる", d,
       move: { old: `夜間最大 ${yen(current.nightMax)}`, new: yen(target), pill: `+${up}%` }, target,
-      effect: { lo: Math.round(metrics.revenue * 0.7 * upRate * 0.7), hi: Math.round(metrics.revenue * 0.7 * upRate) },
+      effect: { lo: Math.round(mRev * 0.7 * upRate * 0.7), hi: Math.round(mRev * 0.7 * upRate) },
       effectNote: "最大料金階層への反映（稼働減を織込み）" });
   }
   // ② 日中値下げ
@@ -59,19 +61,19 @@ export function buildRecommendations(metrics, nightComps, nearest, current) {
   // ③ 未払い是正（ナンバーベース）
   const P = metrics.plates;
   if (metrics.unpaid.count > 0) {
-    let d = `未払い${metrics.unpaid.rate}%・月約${yen(metrics.unpaid.amount)}は、料金改定と同規模の増収余地。`;
-    if (P?.repeats?.length) d += `<b>常習${P.repeats.length}台で金額の${Math.round(100 * P.repeatAmount / Math.max(1, metrics.unpaid.amount))}%（約${yen(P.repeatAmount)}）</b>＝ナンバー特定済みで督促・警告の最優先対象。`;
+    let d = `未払い${metrics.unpaid.rate}%・月約${yen(uAmt)}は増収余地。`;
+    if (P?.repeats?.length) d += `<b>常習${P.repeats.length}台で金額の${Math.round(100 * P.repeatAmount / Math.max(1, metrics.unpaid.amount))}%</b>＝ナンバー特定済みで督促・警告の最優先対象。`;
     if (P?.paidElsewhere) d += `<b>支払い実績のある${P.paidElsewhere}台</b>は回収余地あり。`;
     d += "加えて深夜〜早朝出庫の取りはぐれ対策。";
     recs.push({ kind: "a", t: "未払い（未回収）の是正", d,
-      move: { new: `未回収 月約${yen(metrics.unpaid.amount)} の圧縮` },
+      move: { new: `未回収 月約${yen(uAmt)} の圧縮` },
       steps: [
         "駐車場全体に「カメラによる未払い監視中」の掲示を増設（全体への抑止）",
         "未払いの多い車両のナンバー（下4桁）を場内に警告表示",
         "常習車両をブラックリストに登録し、入庫したタイミングでフロントガラスに警告書面を掲出",
         "運輸局へ登録事項等証明書を請求して所有者を特定し、直接支払いを依頼",
       ],
-      effect: { lo: Math.round(metrics.unpaid.amount * 0.5), hi: metrics.unpaid.amount },
+      effect: { lo: Math.round(uAmt * 0.5), hi: uAmt },
       effectNote: "回収率50〜100%想定" });
   }
 
@@ -80,7 +82,7 @@ export function buildRecommendations(metrics, nightComps, nearest, current) {
   const totalLo = rows.reduce((s, r) => s + (r.lo ?? 0), 0);
   const totalHi = rows.reduce((s, r) => s + (r.hi ?? 0), 0);
   const impact = { rows, lo: totalLo, hi: totalHi,
-    pct: metrics.revenue ? [Math.round(100 * totalLo / metrics.revenue), Math.round(100 * totalHi / metrics.revenue)] : [0, 0] };
+    pct: mRev ? [Math.round(100 * totalLo / mRev), Math.round(100 * totalHi / mRev)] : [0, 0] };
   const r1 = recs.find((r) => r.target);
   return { recs, impact, nightMed, nightTarget: r1?.target ?? null };
 }
@@ -104,7 +106,7 @@ export function renderReport(metrics, data, current = {}, opts = {}) {
     current, impact, nightTarget,
     occ: metrics.hourly.occWeekday, ent: metrics.hourly.entWeekday,
     spaceUse: metrics.spaceUse, maxTierCount: metrics.maxTierCount,
-    revBands: metrics.revenueBands, nightWindow: metrics.nightWindow, dow: metrics.dow, weekly: metrics.weekly,
+    revBands: metrics.revenueBands, nightWindow: metrics.nightWindow, dow: metrics.dow, weekly: metrics.weekly, monthly: metrics.monthly, monthsSpan: metrics.monthsSpan, revenueMonthly: metrics.revenueMonthly,
     plates: metrics.plates,
     nearest: nearest.map((c) => ({ name: c.name, op: c.opLabel, dist: c.dist, unit: c.unit, yph: c.yph })),
     nearestSource: data.nearestSource ?? "",
@@ -166,7 +168,7 @@ const TEMPLATE = `<title>駐車場 料金診断</title>
     <div class="card"><p class="chart-t">時間帯別 稼働台数（平日・平均同時利用）</p><div id="c-occ"></div>
       <div class="legend"><span><span class="dot" style="background:var(--brand)"></span>稼働台数</span><span><span class="dot" style="background:var(--amber)"></span>入庫数</span></div></div>
     <div class="card" style="margin-top:12px;" id="weekly-card"><p class="chart-t">期間中の推移（週次）</p><p class="chart-c" id="weekly-c"></p><div id="c-weekly"></div>
-      <div class="legend"><span><span class="dot" style="background:#009B3E"></span>週次売上</span><span><span class="dot" style="background:#D98200"></span>日次ピーク稼働の平均（台）</span></div></div>
+      <div class="legend"><span><span class="dot" style="background:#009B3E"></span>売上</span><span><span class="dot" style="background:#D98200"></span>日次ピーク稼働の平均（台）</span></div></div>
     <div class="grid k2" style="margin-top:12px;">
       <div class="card" id="space-card"><p class="chart-t">車室別 利用回数</p><div id="c-space"></div></div>
       <div class="card" id="fee-card"><p class="chart-t">料金階層の内訳</p><div id="c-fee"></div></div>
@@ -220,13 +222,14 @@ document.getElementById("meta").innerHTML=[
 const up=D.impact.pct;
 const kpiCard=k=>'<div class="kpi card '+k[3]+'"><div class="lbl">'+k[0]+'</div><div class="val tnum">'+k[1]+'</div><div class="sub">'+k[2]+'</div></div>';
 document.getElementById("kpi-actual-label").textContent="実績（"+D.period+"）";
+const multiM=(D.monthsSpan||1)>1.5;const mRev=D.revenueMonthly??D.revenue;
 document.getElementById("kpis-actual").innerHTML=[
- ["月間売上",yen(D.revenue),D.sessions+"件・平均"+D.avgDur+"分",""],
+ multiM?["月平均売上",yen(mRev),"期間計 "+yen(D.revenue)+"・"+D.sessions.toLocaleString()+"件",""]:["月間売上",yen(D.revenue),D.sessions+"件・平均"+D.avgDur+"分",""],
  ["実効車室数",EFF+"<small>台</small>",D.cap.blocked.length?"車室"+D.cap.blocked.join("・")+"は封鎖":"全"+D.cap.nominal+"車室",""],
  ["夜間ピーク稼働",D.peak.max+"<small>/"+EFF+"台</small>",D.peak.nights+"夜中"+D.peak.fullNights+"夜が満車",""],
 ].map(kpiCard).join("");
 document.getElementById("kpis-est").innerHTML=[
- ["推定 月間売上",yen(D.revenue+D.impact.lo).replace("¥","¥")+"<small>〜"+yen(D.revenue+D.impact.hi).replace("¥","")+"</small>","施策反映後の推定レンジ","est"],
+ ["推定 月間売上",yen(mRev+D.impact.lo)+"<small>〜"+yen(mRev+D.impact.hi).replace("¥","")+"</small>","施策反映後の推定レンジ","est"],
  ["増収余地","+"+up[0]+"–"+up[1]+"<small>%</small>","月 +"+yen(D.impact.lo)+"–"+yen(D.impact.hi).replace("¥",""),"est"],
 ].map(kpiCard).join("");
 // flag
@@ -245,21 +248,24 @@ for(let i=0;i<24;i+=2)s+='<text x="'+x(i)+'" y="'+(H-8)+'" text-anchor="middle" 
 document.getElementById("c-occ").innerHTML=s+"</svg>";})();
 // 期間中の推移（週次: 売上バー + ピーク稼働ライン）
 (function(){
-const Wk=D.weekly||[];const card=document.getElementById("weekly-card");
+const useMonthly=(D.monthly||[]).filter(m=>m.days>=(m.fullDays||28)*0.8).length>=3;
+const Wk=useMonthly?D.monthly:(D.weekly||[]);const card=document.getElementById("weekly-card");
 if(Wk.length<2){if(card)card.style.display="none";return;}
-const fulls=Wk.filter(w=>w.days>=6);
+card.querySelector(".chart-t").textContent="期間中の推移（"+(useMonthly?"月次":"週次")+"）";
+const isFull=w=>useMonthly?w.days>=(w.fullDays||28)*0.8:w.days>=6;
+const fulls=Wk.filter(isFull);
 let trend="";
 if(fulls.length>=2){const a=fulls[0].revenue,b=fulls[fulls.length-1].revenue;const g=a?Math.round(100*(b-a)/a):0;
- trend=(g>=10?"<b>導入後、利用は拡大中</b>（"+fulls[0].label+"→"+fulls[fulls.length-1].label+"で売上+"+g+"%）。":(g<=-10?"<b>直近は減速傾向</b>（"+fulls[0].label+"→"+fulls[fulls.length-1].label+"で売上"+g+"%）。":"<b>売上はおおむね横ばいで安定</b>（週次±10%以内）。"));}
+ trend=(g>=10?"<b>利用は拡大傾向</b>（"+fulls[0].label+"→"+fulls[fulls.length-1].label+"で売上+"+g+"%）。":(g<=-10?"<b>直近は減速傾向</b>（"+fulls[0].label+"→"+fulls[fulls.length-1].label+"で売上"+g+"%）。":"<b>売上はおおむね横ばいで安定</b>（週次±10%以内）。"));}
 document.getElementById("weekly-c").innerHTML=trend;
 const W=880,H=200,pL=56,pR=44,pB=24,pT=14,pw=W-pL-pR,ph=H-pB-pT;
 const maxR=Math.max(...Wk.map(w=>w.revenue),1);const cw=pw/Wk.length;const bx=i=>pL+i*cw+cw*0.15,bw=cw*0.7;
 let s2='<svg viewBox="0 0 '+W+' '+H+'">';
 for(let g=0;g<=3;g++){const gy=pT+ph*(1-g/3);s2+='<line x1="'+pL+'" y1="'+gy+'" x2="'+(W-pR)+'" y2="'+gy+'" stroke="rgba(0,0,0,.06)"/>';}
 Wk.forEach((w,i)=>{const h=ph*(w.revenue/maxR);
- s2+='<rect x="'+bx(i)+'" y="'+(pT+ph-h)+'" width="'+bw+'" height="'+h+'" rx="2" fill="#009B3E" opacity="'+(w.days<6?0.45:0.9)+'"/>';
- s2+='<text x="'+(bx(i)+bw/2)+'" y="'+(pT+ph-h-5)+'" text-anchor="middle" font-size="10" font-weight="700" fill="#1B1E1C">'+yen(w.revenue)+'</text>';
- s2+='<text x="'+(bx(i)+bw/2)+'" y="'+(H-8)+'" text-anchor="middle" font-size="10" fill="#9AA096">'+w.label+(w.days<6?"(途中)":"")+'</text>';});
+ s2+='<rect x="'+bx(i)+'" y="'+(pT+ph-h)+'" width="'+bw+'" height="'+h+'" rx="2" fill="#009B3E" opacity="'+(isFull(w)?0.9:0.45)+'"/>';
+ s2+='<text x="'+(bx(i)+bw/2)+'" y="'+(pT+ph-h-5)+'" text-anchor="middle" font-size="9.5" font-weight="700" fill="#1B1E1C">'+(useMonthly?Math.round(w.revenue/1000)+"k":yen(w.revenue))+'</text>';
+ s2+='<text x="'+(bx(i)+bw/2)+'" y="'+(H-8)+'" text-anchor="middle" font-size="10" fill="#9AA096">'+w.label+(isFull(w)?"":"*")+'</text>';});
 const py=v=>pT+ph*(1-Math.min(1,v/EFF));
 s2+='<polyline points="'+Wk.map((w,i)=>(bx(i)+bw/2)+","+py(w.peakAvg||0)).join(" ")+'" fill="none" stroke="#D98200" stroke-width="2.2"/>';
 Wk.forEach((w,i)=>{s2+='<circle cx="'+(bx(i)+bw/2)+'" cy="'+py(w.peakAvg||0)+'" r="3" fill="#D98200"/><text x="'+(bx(i)+bw/2+7)+'" y="'+(py(w.peakAvg||0)-6)+'" font-size="10" fill="#D98200" font-weight="700">'+(w.peakAvg==null?"":w.peakAvg+"台")+'</text>';});
@@ -303,14 +309,14 @@ document.getElementById("c-dow").innerHTML=s;})();
 // 未払い（ナンバー分析）
 (function(){if(!D.unpaid.count)return;const P=D.plates||{};const el=document.getElementById("unpaid-card");
 document.getElementById("unpaid-wrap").style.display="";
-let h='<p class="chart-t">未回収（未払い）が月 約'+yen(D.unpaid.amount)+(P.repeats&&P.repeats.length?' — ナンバー分析で当て先が明確':'')+'</p>';
+let h='<p class="chart-t">未回収（未払い）が月 約'+yen(D.unpaid.amountMonthly??D.unpaid.amount)+(P.repeats&&P.repeats.length?' — ナンバー分析で当て先が明確':'')+'</p>';
 h+='<p class="chart-c">未払い'+D.unpaid.count+'件＝<b>'+(P.uniqueVehicles||"?")+'台</b>。';
 if(P.repeats&&P.repeats.length)h+='うち<b>常習'+P.repeats.length+'台で'+P.repeatIncidents+'件（'+Math.round(100*P.repeatIncidents/D.unpaid.count)+'%）・約'+yen(P.repeatAmount)+'（金額の'+Math.round(100*P.repeatAmount/Math.max(1,D.unpaid.amount))+'%）</b>を占める。ナンバーは特定済みのため、施策の当て先が絞れる。';
 h+='</p><div class="grid k2"><div>';
 if(P.repeats&&P.repeats.length){
  h+='<p class="chart-t" style="font-size:13px;">複数回未払いの車両（'+P.repeats.length+'台）</p><table style="font-size:12px;"><tr><th>ナンバー</th><th class="num">回数</th><th class="num">金額</th><th>時期</th></tr>';
- P.repeats.forEach(r=>{h+='<tr><td style="font-variant-numeric:tabular-nums">'+esc(r.plate)+'</td><td class="num">'+r.count+'回</td><td class="num">'+yen(r.amount)+'</td><td style="color:var(--grey);font-size:11px">'+esc(r.period)+'</td></tr>';});
- h+='</table>';
+ P.repeats.slice(0,12).forEach(r=>{h+='<tr><td style="font-variant-numeric:tabular-nums">'+esc(r.plate)+'</td><td class="num">'+r.count+'回</td><td class="num">'+yen(r.amount)+'</td><td style="color:var(--grey);font-size:11px">'+esc(r.period)+'</td></tr>';});
+ h+='</table>'+(P.repeats.length>12?'<div style="font-size:11px;color:var(--faint);margin-top:4px">ほか'+(P.repeats.length-12)+'台</div>':'');
 }else h+='<p class="chart-c">複数回未払いの車両はなし。</p>';
 h+='</div><div><p class="chart-t" style="font-size:13px;">未払い車両の支払い履歴（期間内）</p><table style="font-size:12px;"><tr><th>区分</th><th class="num">台数</th><th>示唆</th></tr>';
 h+='<tr><td><b>別の来場で支払い実績あり</b></td><td class="num">'+(P.paidElsewhere||0)+'台</td><td style="font-size:11.5px;color:var(--grey)">支払える客のうっかり/機会的スキップ'+(P.example?'（例: '+esc(P.example.plate.split(" ")[0])+'…は来場'+P.example.visits+'回中'+P.example.paid+'回支払い）':'')+'</td></tr>';

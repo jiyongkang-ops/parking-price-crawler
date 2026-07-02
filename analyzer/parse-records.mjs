@@ -162,31 +162,47 @@ export function parseRecords(csvPath, { capacity = null } = {}) {
   const plates = { uniqueVehicles: unPlates.size, repeats, repeatIncidents, repeatAmount,
     paidElsewhere, neverPaid, onceOnly, example: bestExample };
 
-  // 週次推移（導入後の立ち上がり分析用）: 期間開始から7日刻み
-  const weekly = [];
+  // 推移分析（週次・月次）: 日次ピーク稼働を一度だけ計算して共用
+  const weekly = [], monthly = [];
   {
     const start = new Date(minD.getFullYear(), minD.getMonth(), minD.getDate());
-    // 日次ピーク稼働（全時間帯）
     const dailyPeak = {};
     for (let t = new Date(start); t <= maxD; t = new Date(t.getTime() + 3600e3)) {
       let occ = 0; for (const r of recs) if (r.out && r.in <= t && t < r.out) occ++;
       const k = t.toDateString(); dailyPeak[k] = Math.max(dailyPeak[k] || 0, occ);
     }
+    const peakAvgIn = (from, to) => {
+      let sum = 0, cnt = 0;
+      for (let d = new Date(from); d < to; d = new Date(d.getTime() + 864e5)) {
+        const k = d.toDateString(); if (dailyPeak[k] != null) { sum += dailyPeak[k]; cnt++; }
+      }
+      return cnt ? +(sum / cnt).toFixed(1) : null;
+    };
+    // 週次（期間開始から7日刻み）
     for (let w = 0; ; w++) {
       const from = new Date(start.getTime() + w * 7 * 864e5);
       if (from > maxD) break;
       const to = new Date(Math.min(from.getTime() + 7 * 864e5, maxD.getTime() + 864e5));
       const g = recs.filter((r) => r.in >= from && r.in < to);
-      const days = Math.max(1, Math.round((to - from) / 864e5));
-      let peakSum = 0, peakCnt = 0;
-      for (let d = new Date(from); d < to; d = new Date(d.getTime() + 864e5)) {
-        const k = d.toDateString(); if (dailyPeak[k] != null) { peakSum += dailyPeak[k]; peakCnt++; }
-      }
-      weekly.push({ label: `${from.getMonth() + 1}/${from.getDate()}週`, days,
-        sessions: g.length, revenue: g.reduce((s2, r) => s2 + r.paid, 0),
-        peakAvg: peakCnt ? +(peakSum / peakCnt).toFixed(1) : null });
+      weekly.push({ label: `${from.getMonth() + 1}/${from.getDate()}週`, days: Math.max(1, Math.round((to - from) / 864e5)),
+        sessions: g.length, revenue: g.reduce((s2, r) => s2 + r.paid, 0), peakAvg: peakAvgIn(from, to) });
+    }
+    // 月次（暦月）
+    for (let m = new Date(minD.getFullYear(), minD.getMonth(), 1); m <= maxD; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) {
+      const from = new Date(Math.max(m.getTime(), start.getTime()));
+      const monthEnd = new Date(m.getFullYear(), m.getMonth() + 1, 1);
+      const to = new Date(Math.min(monthEnd.getTime(), maxD.getTime() + 864e5));
+      const g = recs.filter((r) => r.in >= from && r.in < to);
+      const dInM = Math.max(1, Math.round((to - from) / 864e5));
+      monthly.push({ label: `${String(m.getFullYear()).slice(2)}/${m.getMonth() + 1}`, days: dInM,
+        fullDays: Math.round((monthEnd - m) / 864e5),
+        sessions: g.length, revenue: g.reduce((s2, r) => s2 + r.paid, 0), peakAvg: peakAvgIn(from, to) });
     }
   }
+  // 月間換算（複数月CSVでも「月間」の数字を正しく出す）
+  const monthsSpan = +(days / 30.44).toFixed(2);
+  const revenueMonthly = Math.round(collected / Math.max(1, monthsSpan));
+  const unpaidMonthly = Math.round(unpaidAmt / Math.max(1, monthsSpan));
 
   // 日中実効料金（入庫8-16時・同日20時前出庫）
   const dayS = recs.filter((r) => r.out && r.in.getHours() >= 8 && r.in.getHours() <= 16 && r.out.getHours() < 20 && r.out.getDate() === r.in.getDate() && r.fee > 0);
@@ -200,7 +216,7 @@ export function parseRecords(csvPath, { capacity = null } = {}) {
     sessions: recs.length,
     revenue: collected,
     avgDurationMin: Math.round(recs.filter((r) => r.durM).reduce((s, r) => s + r.durM, 0) / Math.max(1, recs.filter((r) => r.durM).length)),
-    unpaid: { count: unpaid.length, amount: unpaidAmt, rate: +(100 * unpaid.length / recs.length).toFixed(1) },
+    unpaid: { count: unpaid.length, amount: unpaidAmt, amountMonthly: unpaidMonthly, rate: +(100 * unpaid.length / recs.length).toFixed(1) },
     capacity: { nominal: nominalCapacity, effective: effectiveCapacity, blocked, spaceTracking },
     peak: { max: peakMax, fullNights, nights: peaks.length },
     spaceUse,
@@ -212,6 +228,6 @@ export function parseRecords(csvPath, { capacity = null } = {}) {
     feeTiers: Object.entries(feeCount).map(([f, c]) => ({ fee: +f, count: c })).sort((a, b) => a.fee - b.fee),
     maxTierCount,
     dayCurve,
-    revenueBands, nightWindow, dow, plates, weekly,
+    revenueBands, nightWindow, dow, plates, weekly, monthly, monthsSpan, revenueMonthly,
   };
 }

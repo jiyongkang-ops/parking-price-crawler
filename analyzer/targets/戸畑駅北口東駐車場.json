@@ -1,0 +1,18 @@
+{
+  "csv": [
+    "/Users/kangjiyong/Downloads/利用状況レポート_戸畑駅北口東駐車場_20260702 (1).csv"
+  ],
+  "address": "福岡県北九州市戸畑区銀座1-1",
+  "lat": 33.897528,
+  "lng": 130.820349,
+  "capacity": 33,
+  "radiusM": 400,
+  "nearestLimit": 12,
+  "current": {
+    "unit": "30分100円",
+    "nightMax": 400,
+    "dayMax": 400,
+    "dayHour1": 200
+  },
+  "out": "reports/戸畑駅北口東駐車場.html"
+}
