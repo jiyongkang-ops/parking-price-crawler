@@ -86,16 +86,30 @@ export async function parkopediaCompetitors({ lat, lng, radiusM = 400 }) {
     if (PK_UID) q.set("uid", PK_UID);
     const r = await (await fetch(`https://${PK_HOST}/api/parking/locations?${q}`, { headers: { Authorization: `Bearer ${at}` } })).json();
     const feats = r.result?.features ?? [];
-    const items = feats.slice(0, 30).map((f) => {
+    // PT12M / PT1H → 分
+    const ptMin = (v) => { const m = String(v || "").match(/PT(?:(\d+)H)?(?:(\d+)M)?/); return m ? (+(m[1] || 0)) * 60 + (+(m[2] || 0)) : null; };
+    // geometry(GeometryCollection or Point) から座標
+    const coordOf = (g) => {
+      if (!g) return null;
+      if (g.type === "Point") return g.coordinates;
+      if (g.type === "GeometryCollection") { const p = (g.geometries || []).find((x) => x.type === "Point"); return p?.coordinates ?? null; }
+      return null;
+    };
+    const items = feats.map((f) => {
       const s = f.properties?.static ?? {};
       const unit = (s.rate_tables?.rate_table?.[0]?.rates ?? []).find((x) => x.type === "DURATION");
+      const mins = unit ? ptMin(unit.value) : null;
+      const c = coordOf(f.geometry);
       return {
         source: "parkopedia", operator: s.operator ?? "", opLabel: s.operator ?? "（その他）",
-        name: s.address?.street?.formatted ?? s.name ?? "", address: s.address?.street?.formatted ?? "",
+        name: (s.name || s.address?.street?.formatted || s.operator || "").trim(),
+        address: s.address?.street?.formatted ?? "",
         dist: s.distance ?? null, capacity: s.capacity ?? null,
-        unit: unit ? `${unit.value}=${unit.price}円` : null,
+        lat: c ? c[1] : null, lng: c ? c[0] : null,
+        unit: unit && mins ? `${mins}分${unit.price}円` : null,
+        yph: unit && mins ? Math.round(unit.price * 60 / mins) : null,
       };
-    });
+    }).sort((a, b) => (a.dist ?? 9e9) - (b.dist ?? 9e9));
     return { available: true, count: feats.length, items };
   } catch (e) {
     return { available: false, items: [], error: e.message };

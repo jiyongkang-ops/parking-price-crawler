@@ -1,86 +1,100 @@
-// レポート生成 -------------------------------------------------------------
-// metrics(parse-records) + competitors + 現行料金 → お客様提示用HTMLを生成。
-// グラフはデータ埋め込み＋インラインJSでSVG描画（外部CDN不使用）。
+// レポート生成（六本木第20で磨き込んだ標準テンプレ）------------------------
+// metrics(parse-records) + 最寄り競合(Parkopedia優先) + 夜間最大(自前クローラ)
+// + 現行料金 → お客様提示用HTML。外部CDN不使用・データ埋め込み。
+//
+// 文言・構成ルール（お客様フィードバック反映済み）:
+//  - 「セッション」→「回駐車」/ 見出しに(コンサル提言)等の括弧書きは付けない
+//  - KPI・タイトルは改行させない（nowrap / h1+サブ行）/ 出典・注記は最小限
+//  - 未払いは車室別ではなくナンバー分析（常習・支払い履歴）
+//  - 曜日レバー（空く曜日は据え置き）を提言に反映
 
 const yen = (n) => (n == null ? "—" : "¥" + Number(n).toLocaleString("ja-JP"));
 const median = (a) => { a = a.filter((x) => x != null).sort((x, y) => x - y); return a.length ? a[a.length >> 1] : null; };
 
-// ルールベースの提言と増収試算を組み立てる
-export function buildRecommendations(metrics, comps, current) {
-  const nightComps = comps.map((c) => c.nightMax).filter(Boolean);
-  const nightMed = median(nightComps);
-  const dayComps = comps.map((c) => c.dayMax).filter(Boolean);
+export function buildRecommendations(metrics, nightComps, nearest, current) {
+  const nightMed = median(nightComps.map((c) => c.nightMax));
+  const dayMedComp = median(nightComps.map((c) => c.dayMax));
+  const nearestYphMed = median(nearest.filter((c) => !c.self).map((c) => c.yph));
   const recs = [];
-  const peakFull = metrics.peak.fullNights / Math.max(1, metrics.peak.nights) >= 0.5;
+  const peakFullRate = metrics.peak.fullNights / Math.max(1, metrics.peak.nights);
+  const peakFull = peakFullRate >= 0.5;
 
-  // ① 夜間値上げ（満車＋周辺より安い場合）
-  if (current.nightMax && nightMed && current.nightMax < nightMed && peakFull) {
-    const target = Math.round(nightMed / 100) * 100;
+  // 曜日レバー: 夜ピークが実効の85%未満の曜日
+  const slackDays = (metrics.dow ?? []).filter((d) => d.nightPeak != null && d.nightPeak < metrics.capacity.effective * 0.85).map((d) => d.day);
+
+  // ① 夜間値上げ
+  if (current.nightMax && peakFull) {
+    const target = nightMed && nightMed > current.nightMax ? Math.round(nightMed / 100) * 100 : Math.round(current.nightMax * 1.2 / 100) * 100;
     const up = Math.round((100 * (target - current.nightMax)) / current.nightMax);
-    recs.push({ kind: "g", t: "夜間の時間帯最大を引き上げる（満車＆周辺最安のため正当）",
-      d: `夜間は実効満車かつ周辺で最安クラス。周辺中央値（約${yen(nightMed)}）まで上げても競争力を保てる。`,
-      move: { old: `夜間最大 ${yen(current.nightMax)}`, new: `${yen(target)}`, pill: `+${up}%` }, target });
+    let d = `夜間は実効満車（キャパ上限）。供給を増やせない以上、価格が唯一のレバー。売上の主軸である最大料金階層を段階的に引き上げる。`;
+    if (nightMed && current.nightMax < nightMed) d = `夜間は実効満車かつ周辺で最安クラス（周辺中央値 約${yen(nightMed)}）。${d}`;
+    if (slackDays.length && slackDays.length < 7) d += `<b>曜日別では${slackDays.join("・")}曜夜のみ空きがある</b>ため、値上げは他曜日に適用し${slackDays.join("・")}曜夜は据え置きが安全。`;
+    recs.push({ kind: "g", t: "夜間の時間帯最大を引き上げる", d,
+      move: { old: `夜間最大 ${yen(current.nightMax)}`, new: yen(target), pill: `+${up}%` }, target });
   }
-  // ② 日中値下げ（割高＋低稼働）
-  const dayAvg = metrics.dayCurve.find((d) => d.label === "2-3h")?.avgFee ?? metrics.dayCurve.at(-1)?.avgFee;
-  const dayMedComp = median(dayComps);
-  if (dayAvg && dayMedComp && dayAvg > dayMedComp) {
-    recs.push({ kind: "a", t: "日中を値下げして空き時間を埋める",
-      d: `日中は割高で稼働が低い。日中最大を周辺並み（約${yen(dayMedComp)}）に下げ、流出している日中需要を取り込む。`,
-      move: { old: `日中 約${yen(dayAvg)}`, new: `約${yen(dayMedComp)}` } });
+  // ② 日中値下げ
+  const dayAvg = metrics.dayCurve.find((x) => x.label === "2-3h")?.avgFee ?? metrics.dayCurve.at(-1)?.avgFee;
+  const selfYph = current.dayHour1 ?? null;
+  if ((selfYph && nearestYphMed && selfYph > nearestYphMed) || (dayAvg && dayMedComp && dayAvg > dayMedComp)) {
+    let d = "日中は割高で稼働が低い。短時間単価と日中最大を周辺並みに下げ、流出している日中需要を取り込む。";
+    if (selfYph && nearestYphMed) d = `当駐車場の${yen(selfYph)}/時は近隣最高水準（周辺中央値 約${yen(nearestYphMed)}/時）。` + d;
+    recs.push({ kind: "a", t: "日中を値下げして空き時間を埋める", d,
+      move: dayMedComp ? { old: `日中 約${yen(dayAvg)}`, new: `約${yen(dayMedComp)}` } : null });
   }
-  // ③ 未払い是正
+  // ③ 未払い是正（ナンバーベース）
+  const P = metrics.plates;
   if (metrics.unpaid.count > 0) {
-    recs.push({ kind: "a", t: "未払い（未回収）の是正",
-      d: `未払い${metrics.unpaid.rate}%・月約${yen(metrics.unpaid.amount)}は、事前精算の徹底・アプリ決済誘導・督促フローの整備で回収率を高める。`,
+    let d = `未払い${metrics.unpaid.rate}%・月約${yen(metrics.unpaid.amount)}は、料金改定と同規模の増収余地。`;
+    if (P?.repeats?.length) d += `<b>常習${P.repeats.length}台で金額の${Math.round(100 * P.repeatAmount / Math.max(1, metrics.unpaid.amount))}%（約${yen(P.repeatAmount)}）</b>＝ナンバー特定済みで督促・警告の最優先対象。`;
+    if (P?.paidElsewhere) d += `<b>支払い実績のある${P.paidElsewhere}台</b>は回収余地あり。`;
+    d += "加えて深夜〜早朝出庫の取りはぐれ対策。";
+    recs.push({ kind: "a", t: "未払い（未回収）の是正", d,
       move: { new: `未回収 月約${yen(metrics.unpaid.amount)} の圧縮` } });
   }
 
-  // 増収試算（夜間値上げ＝最大料金到達層への反映 ＋ 未払い是正）
+  // 増収試算
   let lo = 0, hi = 0;
   const r1 = recs.find((r) => r.target);
-  if (r1) {
-    const share = 0.7; // 最大料金到達層の売上シェア目安
+  if (r1 && current.nightMax) {
+    const share = 0.7;
     const upRate = (r1.target - current.nightMax) / current.nightMax;
-    lo += Math.round(metrics.revenue * share * upRate * 0.7);
-    hi += Math.round(metrics.revenue * share * upRate);
+    lo = Math.round(metrics.revenue * share * upRate * 0.7);
+    hi = Math.round(metrics.revenue * share * upRate);
   }
-  const impact = { lo: lo, hi: hi, unpaid: metrics.unpaid.amount,
-    pct: metrics.revenue ? [Math.round(100 * lo / metrics.revenue), Math.round(100 * hi / metrics.revenue)] : [0, 0] };
-  return { recs, impact, nightMed, dayMedComp };
+  const impact = { lo, hi, pct: metrics.revenue ? [Math.round(100 * lo / metrics.revenue), Math.round(100 * hi / metrics.revenue)] : [0, 0] };
+  return { recs, impact, nightMed, nightTarget: r1?.target ?? null };
 }
 
-export function renderReport(metrics, comps, current = {}, opts = {}) {
-  const changes = opts.changes ?? [];
-  const map = opts.map ?? { dataUri: null, marked: [] };
-  const { recs, impact, nightMed } = buildRecommendations(metrics, comps, current);
-  const cap = metrics.capacity;
+// metrics: parseRecords の結果 / data: { nearest[], nearestSource, nightComps[], map, changes }
+export function renderReport(metrics, data, current = {}, opts = {}) {
+  const nearest = data.nearest ?? [];
+  const nightComps = data.nightComps ?? [];
+  const { recs, impact, nightTarget } = buildRecommendations(metrics, nightComps, nearest, current);
   const fmtDate = (d) => `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
-  // 夜間比較データ（当駐車場＋競合、nightMaxを持つもの）
-  const nightRows = comps.filter((c) => c.nightMax).map((c) => ({ n: (c.name || c.opLabel).replace(/駐車場$/, "").slice(0, 22), v: c.nightMax, self: false }));
+
+  const nightRows = nightComps.filter((c) => c.nightMax)
+    .map((c) => ({ n: (c.name || c.opLabel).replace(/駐車場$/, "").slice(0, 24), v: c.nightMax, self: false }));
   if (current.nightMax) nightRows.push({ n: `当駐車場（${metrics.parkName}）`, v: current.nightMax, self: true });
-  // 日中比較（1h/3h：当駐車場＝dayCurve、競合＝unit・dayMax概算）
-  const dayRows = [{ n: `当駐車場（${metrics.parkName}）`, self: true,
-    h1: current.dayHour1 ?? metrics.dayCurve[0]?.avgFee, h3: current.dayMax ?? metrics.dayCurve.at(-1)?.avgFee }]
-    .concat(comps.filter((c) => c.yph || c.dayMax).slice(0, 7).map((c) => ({ n: (c.name || c.opLabel).replace(/駐車場$/, "").slice(0, 18), self: false, h1: c.yph, h3: c.dayMax })));
 
   const payload = {
-    park: metrics.parkName, address: opts.address ?? "", period: `${fmtDate(metrics.period.from)}–${fmtDate(metrics.period.to)}`,
+    park: metrics.parkName, address: opts.address ?? "",
+    period: `${fmtDate(metrics.period.from)}–${fmtDate(metrics.period.to)}`,
     sessions: metrics.sessions, revenue: metrics.revenue, avgDur: metrics.avgDurationMin,
-    cap, peak: metrics.peak, unpaid: metrics.unpaid,
-    current, impact, nightMed,
+    cap: metrics.capacity, peak: metrics.peak, unpaid: metrics.unpaid,
+    current, impact, nightTarget,
     occ: metrics.hourly.occWeekday, ent: metrics.hourly.entWeekday,
-    spaceUse: metrics.spaceUse, feeTiers: metrics.feeTiers, maxTierCount: metrics.maxTierCount,
-    nightRows, dayRows, recs,
-    changes: changes.map((c) => ({ op: c.opLabel, name: c.name, dist: c.dist, at: c.at, night: c.fee?.max24h ?? null })),
-    map: map.dataUri ? { dataUri: map.dataUri, legend: map.marked.map((c, i) => ({ no: i + 1, name: (c.name || c.opLabel || "").replace(/駐車場$/, ""), dist: c.dist, night: c.nightMax ?? null })) } : null,
-    genAt: opts.genAt ?? "",
+    spaceUse: metrics.spaceUse, maxTierCount: metrics.maxTierCount,
+    revBands: metrics.revenueBands, nightWindow: metrics.nightWindow, dow: metrics.dow,
+    plates: metrics.plates,
+    nearest: nearest.map((c) => ({ name: c.name, op: c.opLabel, dist: c.dist, unit: c.unit, yph: c.yph })),
+    nearestSource: data.nearestSource ?? "",
+    nightRows, recs,
+    map: data.map?.dataUri ? { dataUri: data.map.dataUri, legend: data.map.legend ?? [] } : null,
   };
   return TEMPLATE.replace("/*__PAYLOAD__*/", JSON.stringify(payload).replace(/</g, "\\u003c"));
 }
 
-// テンプレHTML（roppongi-proposal.html を汎用化）。__PAYLOAD__ にデータを注入。
-const TEMPLATE = `<title>駐車場 料金ご提案</title>
+const TEMPLATE = `<title>駐車場 料金診断</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   :root{--bg:#F5F7F6;--card:#FFF;--ink:#1B1E1C;--grey:#63685F;--faint:#9AA096;--line:rgba(0,0,0,.10);--line-soft:rgba(0,0,0,.05);--brand:#009B3E;--brand-dark:#00622A;--brand-light:#E5F5EC;--amber:#D98200;--amber-bg:#FBF1E1;--red:#D0433A;--font:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic Medium","Noto Sans JP","Meiryo",system-ui,sans-serif;}
@@ -98,11 +112,13 @@ const TEMPLATE = `<title>駐車場 料金ご提案</title>
   .chart-t{font-weight:700;font-size:14px;margin:0 0 3px;} .chart-c{color:var(--grey);font-size:12px;margin:0 0 14px;}
   .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--grey);margin-top:10px;} .legend span{display:inline-flex;align-items:center;gap:6px;} .dot{width:11px;height:11px;border-radius:3px;display:inline-block;}
   table{border-collapse:collapse;width:100%;font-size:13px;} th,td{padding:9px 11px;border-bottom:1px solid var(--line-soft);text-align:left;} th{font-size:11.5px;color:var(--grey);font-weight:700;background:#F0F2F0;} td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;} tr.hot td{background:var(--amber-bg);}
-  .tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:5px;background:#EEF1EE;color:#3d7a1f;}
+  .tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:5px;background:#EEF1EE;color:#3d7a1f;white-space:nowrap;}
   .rec{display:flex;gap:16px;align-items:flex-start;padding:16px 0;border-bottom:1px solid var(--line-soft);} .rec:last-child{border-bottom:none;} .rec .n{flex:0 0 30px;height:30px;border-radius:8px;color:#fff;display:grid;place-items:center;font-weight:800;} .rec .n.g{background:var(--brand);} .rec .n.a{background:var(--amber);} .rec .t{font-weight:700;font-size:15px;} .rec .d{color:var(--grey);font-size:13px;margin-top:3px;}
   .move{margin-top:6px;font-weight:800;font-variant-numeric:tabular-nums;} .move .old{color:var(--faint);text-decoration:line-through;} .move .new{color:var(--brand-dark);} .move .pill{background:var(--brand-light);color:var(--brand-dark);border-radius:999px;padding:1px 9px;font-size:12px;margin-left:6px;}
   .callout{background:var(--brand-light);border:1px solid #B7E3C7;border-radius:12px;padding:18px 20px;margin-top:16px;} .callout .big{font-size:26px;font-weight:800;color:var(--brand-dark);}
   .flag{background:var(--brand-light);border:1px solid #B7E3C7;border-radius:12px;padding:16px 20px;margin-bottom:16px;display:flex;gap:14px;} .flag .em{font-size:22px;} .flag .t{font-weight:800;font-size:15px;color:var(--brand-dark);} .flag .d{font-size:13px;color:var(--brand-dark);margin-top:2px;}
+  .unpaid-card{border-left:3px solid var(--amber);} .unpaid-card .chart-t{color:#9A5B00;}
+  .hbar{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:12px;} .hbar .l{width:92px;color:var(--grey);} .hbar .track{flex:1;background:#EEF1EE;border-radius:4px;} .hbar .fill{height:14px;border-radius:4px;} .hbar .v{width:150px;text-align:right;font-variant-numeric:tabular-nums;}
   svg{display:block;width:100%;height:auto;overflow:visible;}
   @page{margin:12mm;} @media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}body{background:#fff;}.card,.kpi,.callout,.flag,.rec{break-inside:avoid;}.section{break-inside:avoid-page;}}
 </style>
@@ -110,56 +126,151 @@ const TEMPLATE = `<title>駐車場 料金ご提案</title>
 <div class="wrap">
   <div class="grid k4" style="margin-bottom:16px;" id="kpis"></div>
   <div class="flag" id="flag" style="display:none;"></div>
-  <div class="section"><div class="sec-h"><span class="no">01</span><h2>いつ混み、いつ空くか</h2></div>
+
+  <div class="section">
+    <div class="sec-h"><span class="no">01</span><h2>いつ混み、いつ空くか</h2></div>
     <div class="card"><p class="chart-t">時間帯別 稼働台数（平日・平均同時利用）</p><div id="c-occ"></div>
       <div class="legend"><span><span class="dot" style="background:var(--brand)"></span>稼働台数</span><span><span class="dot" style="background:var(--amber)"></span>入庫数</span></div></div>
-    <div class="grid k2" style="margin-top:16px;"><div class="card"><p class="chart-t">車室別 利用回数</p><div id="c-space"></div></div>
-      <div class="card"><p class="chart-t">料金階層の内訳</p><div id="c-fee"></div></div></div>
-    <div class="section" id="unpaid-wrap" style="display:none;"><div class="card" style="border-left:3px solid var(--amber);"><p class="chart-t" id="unpaid-t" style="color:#9A5B00;"></p><p class="chart-c" id="unpaid-d"></p></div></div>
+    <div class="grid k2" style="margin-top:16px;">
+      <div class="card"><p class="chart-t">車室別 利用回数</p><div id="c-space"></div></div>
+      <div class="card"><p class="chart-t">料金階層の内訳</p><div id="c-fee"></div></div>
+    </div>
+    <div class="grid k2" style="margin-top:16px;">
+      <div class="card"><p class="chart-t">時間帯別 売上構成（入庫時刻ベース）</p><p class="chart-c" id="revband-c"></p><div id="c-revband"></div></div>
+      <div class="card"><p class="chart-t">曜日別 売上シェアと夜間ピーク稼働</p><p class="chart-c" id="dow-c"></p><div id="c-dow"></div></div>
+    </div>
+    <div class="section" id="unpaid-wrap" style="display:none;"><div class="card unpaid-card" id="unpaid-card"></div></div>
   </div>
-  <div class="section"><div class="sec-h"><span class="no">02</span><h2>混雑時／閑散時、周辺より高いか安いか</h2></div>
-    <p class="sec-sub">周辺駐車場（公開料金を調査）と、需要が高い夜間・低い日中で比較。</p>
-    <div class="card" id="map-card" style="display:none;margin-bottom:16px;"><p class="chart-t">周辺マップ（当駐車場と競合の位置）</p><div id="map-img"></div><div class="legend" id="map-legend" style="margin-top:10px;"></div></div>
-    <div class="card"><p class="chart-t">夜間 最大料金の比較（当駐車場 vs 周辺）</p><div id="c-night"></div></div>
-    <div class="card" style="margin-top:16px;overflow-x:auto;"><p class="chart-t">日中の料金比較</p><table><thead><tr><th>駐車場</th><th class="num">1時間</th><th class="num">3時間/日中最大</th></tr></thead><tbody id="tbl-day"></tbody></table></div>
+
+  <div class="section">
+    <div class="sec-h"><span class="no">02</span><h2>混雑時／閑散時、周辺より高いか安いか</h2></div>
+    <p class="sec-sub" id="sec2-sub">事業者を問わず、当駐車場から最寄りの駐車場を距離順に比較（公開料金を調査）。</p>
+    <div class="card" id="map-card" style="display:none;margin-bottom:16px;"><p class="chart-t">周辺マップ（当駐車場と最寄り競合の位置）</p><div id="map-img"></div><div class="legend" id="map-legend" style="margin-top:10px;"></div></div>
+    <div class="card" id="nearest-card" style="display:none;overflow-x:auto;"><p class="chart-t">最寄りの周辺駐車場（距離順・全事業者）— 料金比較</p><p class="chart-c" id="nearest-c"></p>
+      <table><thead><tr><th class="num">距離</th><th>駐車場</th><th>運営</th><th class="num">単価</th><th class="num">円/時</th></tr></thead><tbody id="tbl-nearest"></tbody></table></div>
+    <div class="card" id="night-card" style="display:none;margin-top:16px;"><p class="chart-t">夜間 最大料金の比較（周辺の主要事業者）</p><p class="chart-c" id="night-c"></p><div id="c-night"></div>
+      <div class="legend"><span><span class="dot" style="background:#D98200"></span>当駐車場</span><span><span class="dot" style="background:#B7DEC6"></span>周辺競合</span></div></div>
   </div>
-  <div class="section"><div class="sec-h"><span class="no">03</span><h2>周辺の最近の料金変更</h2></div><div class="card" id="changes-card"></div></div>
-  <div class="section"><div class="sec-h"><span class="no">04</span><h2>売上最大化の料金設計</h2></div>
-    <div class="card" id="recs"></div><div class="callout" id="impact"></div></div>
+
+  <div class="section">
+    <div class="sec-h"><span class="no">03</span><h2>売上最大化の料金設計</h2></div>
+    <p class="sec-sub" id="sec3-sub"></p>
+    <div class="card" id="recs"></div>
+    <div class="callout" id="impact"></div>
+  </div>
 </div>
 <script id="d" type="application/json">/*__PAYLOAD__*/</script>
 <script>
-const D=JSON.parse(document.getElementById("d").textContent);const yen=n=>n==null?"—":"¥"+Number(n).toLocaleString("ja-JP");
+const D=JSON.parse(document.getElementById("d").textContent);
+const yen=n=>n==null?"—":"¥"+Number(n).toLocaleString("ja-JP");
+const esc=s=>(s==null?"":String(s)).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const EFF=D.cap.effective;
 document.getElementById("h1").textContent=D.park;
-document.getElementById("meta").innerHTML=[D.address&&"📍 <b>"+D.address+"</b>","🚗 <b>実効"+D.cap.effective+"車室"+(D.cap.blocked.length?"（"+D.cap.blocked.join("・")+"は封鎖）":"")+"</b>","📅 <b>"+D.period+"</b>（"+D.sessions.toLocaleString()+"回駐車）",D.current.unit&&"💳 現行 <b>"+D.current.unit+(D.current.nightMax?" / 夜間最大"+yen(D.current.nightMax):"")+"</b>"].filter(Boolean).join("");
+document.getElementById("meta").innerHTML=[
+ D.address&&"📍 <b>"+esc(D.address)+"</b>",
+ "🚗 <b>実効"+EFF+"車室"+(D.cap.blocked.length?"（"+D.cap.blocked.join("・")+"は封鎖）":"")+"</b>",
+ "📅 <b>"+D.period+"</b>（"+D.sessions.toLocaleString()+"回駐車）",
+ D.current.unit&&"💳 現行 <b>"+esc(D.current.unit)+(D.current.nightMax?" / 夜間最大"+yen(D.current.nightMax):"")+"</b>",
+].filter(Boolean).join("");
 // KPI
-const upl=D.impact.pct;
+const up=D.impact.pct;
 document.getElementById("kpis").innerHTML=[
  ["月間売上（実績）",yen(D.revenue),D.sessions+"件・平均"+D.avgDur+"分",""],
- ["実効車室数（上限）",D.cap.effective+"<small>台</small>",D.cap.blocked.length?"車室"+D.cap.blocked.join("・")+"は封鎖":"",""],
- ["夜間ピーク稼働",D.peak.max+"<small>/"+D.cap.effective+"台</small>",D.peak.nights+"夜中"+D.peak.fullNights+"夜が満車","accent"],
- ["推定 増収余地","+"+upl[0]+"–"+upl[1]+"<small>%</small>","月 +"+yen(D.impact.lo)+"–"+yen(D.impact.hi).replace("¥",""),"accent"],
+ ["実効車室数（上限）",EFF+"<small>台</small>",D.cap.blocked.length?"車室"+D.cap.blocked.join("・")+"は封鎖":"全"+D.cap.nominal+"車室",""],
+ ["夜間ピーク稼働",D.peak.max+"<small>/"+EFF+"台</small>",D.peak.nights+"夜中"+D.peak.fullNights+"夜が満車","accent"],
+ ["推定 増収余地","+"+up[0]+"–"+up[1]+"<small>%</small>","月 +"+yen(D.impact.lo)+"–"+yen(D.impact.hi).replace("¥",""),"accent"],
 ].map(k=>'<div class="kpi card '+k[3]+'"><div class="lbl">'+k[0]+'</div><div class="val tnum">'+k[1]+'</div><div class="sub">'+k[2]+'</div></div>').join("");
-// flag（封鎖がある場合）
-if(D.cap.blocked.length){const f=document.getElementById("flag");f.style.display="";f.innerHTML='<div class="em">📌</div><div><div class="t">前提：車室'+D.cap.blocked.join("・")+'は封鎖。実効キャパ'+D.cap.effective+'台が上限。</div><div class="d"><b>'+D.cap.effective+'台がフル稼働の上限</b>。夜間ピークは'+D.peak.nights+'夜中'+D.peak.fullNights+'夜が満車。供給を増やせない以上、ピーク時に売上を伸ばす手段は<b>価格</b>。</div></div>';}
+// flag
+if(D.cap.blocked.length&&D.peak.fullNights/Math.max(1,D.peak.nights)>=0.5){
+  const f=document.getElementById("flag");f.style.display="";
+  f.innerHTML='<div class="em">📌</div><div><div class="t">前提：車室'+D.cap.blocked.join("・")+'は封鎖。実効キャパ'+EFF+'台が上限。</div><div class="d"><b>'+EFF+'台がフル稼働の上限</b>。夜間ピークは'+D.peak.nights+'夜中'+D.peak.fullNights+'夜が満車。供給を増やせない以上、ピーク時に売上を伸ばす手段は<b>価格</b>。</div></div>';
+}
 // 稼働×入庫
-(function(){const O=D.occ,E=D.ent,W=880,H=240,pL=34,pB=26,pT=10,pw=W-pL-20,ph=H-pB-pT;const x=i=>pL+i*(pw/24)+(pw/24)/2,yO=v=>pT+ph*(1-v/D.cap.effective);const mE=Math.max(...E,1),yE=v=>pT+ph*(1-v/mE);let s='<svg viewBox="0 0 '+W+' '+H+'">';for(let g=0;g<=D.cap.effective;g+=Math.ceil(D.cap.effective/3)){const gy=yO(g);s+='<line x1="'+pL+'" y1="'+gy+'" x2="'+(W-20)+'" y2="'+gy+'" stroke="rgba(0,0,0,.06)"/><text x="'+(pL-6)+'" y="'+(gy+4)+'" text-anchor="end" font-size="10" fill="#9AA096">'+g+'</text>';}const bw=pw/24*.6;O.forEach((v,i)=>{const h=ph*(v/D.cap.effective);s+='<rect x="'+(x(i)-bw/2)+'" y="'+(pT+ph-h)+'" width="'+bw+'" height="'+h+'" rx="2" fill="#009B3E" opacity="'+((i>=19||i<2)?.95:.5)+'"/>';});s+='<polyline points="'+E.map((v,i)=>x(i)+","+yE(v)).join(" ")+'" fill="none" stroke="#D98200" stroke-width="2.2"/>';for(let i=0;i<24;i+=2)s+='<text x="'+x(i)+'" y="'+(H-8)+'" text-anchor="middle" font-size="10" fill="#9AA096">'+i+'時</text>';document.getElementById("c-occ").innerHTML=s+"</svg>";})();
+(function(){const O=D.occ,E=D.ent,W=880,H=240,pL=34,pB=26,pT=10,pw=W-pL-20,ph=H-pB-pT;
+const x=i=>pL+i*(pw/24)+(pw/24)/2,yO=v=>pT+ph*(1-v/EFF);const mE=Math.max(...E,1),yE=v=>pT+ph*(1-v/mE);
+let s='<svg viewBox="0 0 '+W+' '+H+'">';
+for(let g=0;g<=EFF;g+=Math.max(1,Math.ceil(EFF/3))){const gy=yO(g);s+='<line x1="'+pL+'" y1="'+gy+'" x2="'+(W-20)+'" y2="'+gy+'" stroke="rgba(0,0,0,.06)"/><text x="'+(pL-6)+'" y="'+(gy+4)+'" text-anchor="end" font-size="10" fill="#9AA096">'+g+'</text>';}
+const bw=pw/24*.6;O.forEach((v,i)=>{const h=ph*Math.min(1,v/EFF);s+='<rect x="'+(x(i)-bw/2)+'" y="'+(pT+ph-h)+'" width="'+bw+'" height="'+h+'" rx="2" fill="#009B3E" opacity="'+((i>=19||i<2)?.95:.5)+'"/>';});
+s+='<polyline points="'+E.map((v,i)=>x(i)+","+yE(v)).join(" ")+'" fill="none" stroke="#D98200" stroke-width="2.2"/>';
+for(let i=0;i<24;i+=2)s+='<text x="'+x(i)+'" y="'+(H-8)+'" text-anchor="middle" font-size="10" fill="#9AA096">'+i+'時</text>';
+document.getElementById("c-occ").innerHTML=s+"</svg>";})();
 // 車室別
-(function(){const keys=Object.keys(D.spaceUse).map(Number);const all=[];for(let n=1;n<=D.cap.nominal;n++)all.push([n,D.spaceUse[n]||0]);const max=Math.max(...all.map(a=>a[1]),1);const W=440,bh=13,gap=4,pL=44,pT=4,H=pT+all.length*(bh+gap);let s='<svg viewBox="0 0 '+W+' '+H+'">';all.forEach(([k,v],i)=>{const y=pT+i*(bh+gap);const dead=v===0;s+='<text x="'+(pL-6)+'" y="'+(y+bh-2)+'" text-anchor="end" font-size="10" fill="'+(dead?"#8a7a55":"#9AA096")+'">車室'+k+'</text>';if(dead)s+='<rect x="'+pL+'" y="'+y+'" width="'+(W-pL-40)+'" height="'+bh+'" rx="2" fill="#F0EEE9"/><text x="'+(pL+6)+'" y="'+(y+bh-2)+'" font-size="10" fill="#8a7a55" font-weight="700">封鎖（0回）</text>';else{const w=(W-pL-40)*(v/max);s+='<rect x="'+pL+'" y="'+y+'" width="'+w+'" height="'+bh+'" rx="2" fill="#B7DEC6"/><text x="'+(pL+w+4)+'" y="'+(y+bh-2)+'" font-size="10" fill="#63685F">'+v+'</text>';}});document.getElementById("c-space").innerHTML=s+"</svg>";})();
+(function(){const all=[];for(let n=1;n<=D.cap.nominal;n++)all.push([n,D.spaceUse[n]||0]);
+const max=Math.max(...all.map(a=>a[1]),1);const W=440,bh=13,gap=4,pL=44,pT=4,H=pT+all.length*(bh+gap);
+let s='<svg viewBox="0 0 '+W+' '+H+'">';
+all.forEach(([k,v],i)=>{const y=pT+i*(bh+gap);const dead=v===0;
+ s+='<text x="'+(pL-6)+'" y="'+(y+bh-2)+'" text-anchor="end" font-size="10" fill="'+(dead?"#8a7a55":"#9AA096")+'">車室'+k+'</text>';
+ if(dead)s+='<rect x="'+pL+'" y="'+y+'" width="'+(W-pL-40)+'" height="'+bh+'" rx="2" fill="#F0EEE9"/><text x="'+(pL+6)+'" y="'+(y+bh-2)+'" font-size="10" fill="#8a7a55" font-weight="700">封鎖（0回）</text>';
+ else{const w=(W-pL-40)*(v/max);s+='<rect x="'+pL+'" y="'+y+'" width="'+w+'" height="'+bh+'" rx="2" fill="#B7DEC6"/><text x="'+(pL+w+4)+'" y="'+(y+bh-2)+'" font-size="10" fill="#63685F">'+v+'</text>';}});
+document.getElementById("c-space").innerHTML=s+"</svg>";})();
 // 料金階層
-(function(){const mt=D.maxTierCount,tot=D.sessions,other=tot-mt;const rows=[["最大料金 到達層",mt,"#009B3E"],["単価・短時間ほか",other,"#B7DEC6"]];let s='<div style="display:flex;flex-direction:column;gap:12px;margin-top:6px;">';rows.forEach(([l,n,c])=>{const p=Math.round(100*n/tot);s+='<div><div style="display:flex;justify-content:space-between;font-size:12px;"><span>'+l+'</span><span style="font-weight:700">'+n+'件・'+p+'%</span></div><div style="background:#EEF1EE;border-radius:5px;height:12px;margin-top:3px;"><div style="width:'+p+'%;height:12px;border-radius:5px;background:'+c+'"></div></div></div>';});document.getElementById("c-fee").innerHTML=s+"</div>";})();
-// 未払い
-if(D.unpaid.count>0){document.getElementById("unpaid-wrap").style.display="";document.getElementById("unpaid-t").textContent="未回収（未払い）が月 約"+yen(D.unpaid.amount);document.getElementById("unpaid-d").innerHTML=D.sessions+"件中 <b>"+D.unpaid.count+"件（"+D.unpaid.rate+"%）が未払い</b>。精算されない出庫が主因とみられ、料金改定と同規模の増収余地。";}
-// 夜間比較
-(function(){const rows=[...D.nightRows].sort((a,b)=>b.v-a.v);if(!rows.length){document.getElementById("c-night").innerHTML='<div style="color:#9AA096;font-size:12px">競合の夜間最大データが未取得です</div>';return;}const W=900,bh=26,gap=10,pL=250,pT=6,H=pT+rows.length*(bh+gap);const max=Math.max(...rows.map(r=>r.v))*1.1,sc=(W-pL-70)/max;let s='<svg viewBox="0 0 '+W+' '+H+'">';rows.forEach((d,i)=>{const y=pT+i*(bh+gap),w=d.v*sc;s+='<text x="'+(pL-8)+'" y="'+(y+bh/2+4)+'" text-anchor="end" font-size="10.5" fill="'+(d.self?"#00622A":"#63685F")+'" font-weight="'+(d.self?800:500)+'">'+d.n+'</text><rect x="'+pL+'" y="'+y+'" width="'+w+'" height="'+bh+'" rx="3" fill="'+(d.self?"#D98200":"#B7DEC6")+'"/><text x="'+(pL+w+6)+'" y="'+(y+bh/2+4)+'" font-size="11.5" font-weight="800">'+yen(d.v)+'</text>';});if(D.nightMed){const rx=pL+D.nightMed*sc;s+='<line x1="'+rx+'" y1="0" x2="'+rx+'" y2="'+H+'" stroke="#009B3E" stroke-width="1.5" stroke-dasharray="4 3"/>';}document.getElementById("c-night").innerHTML=s+"</svg>";})();
-// 日中テーブル
-document.getElementById("tbl-day").innerHTML=D.dayRows.map(d=>'<tr class="'+(d.self?"hot":"")+'"><td'+(d.self?' style="font-weight:800"':'')+'>'+d.n+'</td><td class="num">'+yen(d.h1)+(d.self?" ⚠":"")+'</td><td class="num">'+yen(d.h3)+'</td></tr>').join("");
-// 提言
-document.getElementById("recs").innerHTML=D.recs.map((r,i)=>'<div class="rec"><div class="n '+r.kind+'">'+(i+1)+'</div><div><div class="t">'+r.t+'</div><div class="d">'+r.d+'</div>'+(r.move?'<div class="move">'+(r.move.old?'<span class="old">'+r.move.old+'</span> → ':'')+'<span class="new">'+r.move.new+'</span>'+(r.move.pill?'<span class="pill">'+r.move.pill+'</span>':'')+'</div>':'')+'</div></div>').join("");
-// インパクト
-document.getElementById("impact").innerHTML='<div style="font-size:12px;font-weight:700;color:var(--brand-dark)">推定インパクト</div><div class="big">月間売上 +'+yen(D.impact.lo)+'〜'+yen(D.impact.hi)+'（+'+upl[0]+'〜'+upl[1]+'%）</div>'+(D.unpaid.amount?'<div style="font-size:13px;color:var(--brand-dark);margin-top:4px">加えて未払い是正で最大 +'+yen(D.unpaid.amount)+'/月 の回収余地。</div>':'');
+(function(){const mt=D.maxTierCount,tot=D.sessions,rows=[["最大料金 到達層",mt,"#009B3E"],["単価・短時間ほか",tot-mt,"#B7DEC6"]];
+let s='<div style="display:flex;flex-direction:column;gap:12px;margin-top:6px;">';
+rows.forEach(([l,n,c])=>{const p=Math.round(100*n/tot);s+='<div><div style="display:flex;justify-content:space-between;font-size:12px;"><span>'+l+'</span><span style="font-weight:700">'+n+'件・'+p+'%</span></div><div style="background:#EEF1EE;border-radius:5px;height:12px;margin-top:3px;"><div style="width:'+p+'%;height:12px;border-radius:5px;background:'+c+'"></div></div></div>';});
+document.getElementById("c-fee").innerHTML=s+"</div>";})();
+// 時間帯別 売上構成
+(function(){const rb=D.revBands||[];if(!rb.length)return;
+const maxp=Math.max(...rb.map(b=>b.pct),1);
+document.getElementById("revband-c").innerHTML="<b>夜間最大の適用窓（20時〜翌8時）に滞在がかかる駐車は"+D.nightWindow.count+"件・売上の"+D.nightWindow.share+"%（約"+yen(D.nightWindow.revenue)+"）</b>。夜間最大の改定が効く土台。";
+const order=["日中(8-17時)","夜間(17-24時)","深夜(0-5時)","早朝(5-8時)"];
+let s="";order.forEach(lbl=>{const b=rb.find(x=>x.label===lbl);if(!b)return;const night=/夜間|深夜/.test(lbl);
+ s+='<div class="hbar"><div class="l">'+lbl+'</div><div class="track"><div class="fill" style="width:'+Math.round(100*b.pct/maxp)+'%;background:'+(night?"#009B3E":"#B7DEC6")+'"></div></div><div class="v">'+yen(b.revenue)+'・'+b.pct+'%</div></div>';});
+document.getElementById("c-revband").innerHTML=s;})();
+// 曜日別
+(function(){const dw=D.dow||[];if(!dw.length)return;
+const slack=dw.filter(d=>d.nightPeak!=null&&d.nightPeak<EFF*0.85).map(d=>d.day);
+const fullDays=dw.filter(d=>d.nightPeak!=null&&d.nightPeak>=EFF*0.95).map(d=>d.day);
+document.getElementById("dow-c").innerHTML=(slack.length&&slack.length<7)
+ ?("<b>"+(fullDays.length>=5?"ほとんどの曜日の夜が実効満車":"夜間満車の曜日が多い")+"</b>。唯一<b>"+slack.join("・")+"曜夜のみ空きがある</b>（オレンジ）。→ 夜間値上げは他曜日に適用し、"+slack.join("・")+"曜夜は据え置きとする曜日レバーが有効。")
+ :"全曜日で夜間の稼働が高い。";
+const maxp=Math.max(...dw.map(d=>d.pct),1);let s="";
+dw.forEach(d=>{const slackD=d.nightPeak!=null&&d.nightPeak<EFF*0.85;
+ s+='<div class="hbar"><div class="l">'+d.day+'曜</div><div class="track"><div class="fill" style="width:'+Math.round(100*d.pct/maxp)+'%;background:'+(slackD?"#D98200":"#009B3E")+'"></div></div><div class="v">'+d.pct+'%・夜ピーク'+(d.nightPeak??"—")+'台</div></div>';});
+document.getElementById("c-dow").innerHTML=s;})();
+// 未払い（ナンバー分析）
+(function(){if(!D.unpaid.count)return;const P=D.plates||{};const el=document.getElementById("unpaid-card");
+document.getElementById("unpaid-wrap").style.display="";
+let h='<p class="chart-t">未回収（未払い）が月 約'+yen(D.unpaid.amount)+(P.repeats&&P.repeats.length?' — ナンバー分析で当て先が明確':'')+'</p>';
+h+='<p class="chart-c">未払い'+D.unpaid.count+'件＝<b>'+(P.uniqueVehicles||"?")+'台</b>。';
+if(P.repeats&&P.repeats.length)h+='うち<b>常習'+P.repeats.length+'台で'+P.repeatIncidents+'件（'+Math.round(100*P.repeatIncidents/D.unpaid.count)+'%）・約'+yen(P.repeatAmount)+'（金額の'+Math.round(100*P.repeatAmount/Math.max(1,D.unpaid.amount))+'%）</b>を占める。ナンバーは特定済みのため、施策の当て先が絞れる。';
+h+='</p><div class="grid k2"><div>';
+if(P.repeats&&P.repeats.length){
+ h+='<p class="chart-t" style="font-size:13px;">複数回未払いの車両（'+P.repeats.length+'台）</p><table style="font-size:12px;"><tr><th>ナンバー</th><th class="num">回数</th><th class="num">金額</th><th>時期</th></tr>';
+ P.repeats.forEach(r=>{h+='<tr><td style="font-variant-numeric:tabular-nums">'+esc(r.plate)+'</td><td class="num">'+r.count+'回</td><td class="num">'+yen(r.amount)+'</td><td style="color:var(--grey);font-size:11px">'+esc(r.period)+'</td></tr>';});
+ h+='</table>';
+}else h+='<p class="chart-c">複数回未払いの車両はなし。</p>';
+h+='</div><div><p class="chart-t" style="font-size:13px;">未払い車両の支払い履歴（期間内）</p><table style="font-size:12px;"><tr><th>区分</th><th class="num">台数</th><th>示唆</th></tr>';
+h+='<tr><td><b>別の来場で支払い実績あり</b></td><td class="num">'+(P.paidElsewhere||0)+'台</td><td style="font-size:11.5px;color:var(--grey)">支払える客のうっかり/機会的スキップ'+(P.example?'（例: '+esc(P.example.plate.split(" ")[0])+'…は来場'+P.example.visits+'回中'+P.example.paid+'回支払い）':'')+'</td></tr>';
+h+='<tr><td>期間内の支払い履歴なし</td><td class="num">'+(P.neverPaid||0)+'台</td><td style="font-size:11.5px;color:var(--grey)">うち'+(P.onceOnly||0)+'台は来場1回のみ（一見）。常習車両は<b>督促・警告の最優先対象</b></td></tr></table></div></div>';
+el.innerHTML=h;})();
 // 周辺マップ
-if(D.map&&D.map.dataUri){const el=document.getElementById("map-card");el.style.display="";document.getElementById("map-img").innerHTML='<img src="'+D.map.dataUri+'" style="width:100%;border-radius:8px;border:1px solid var(--line);display:block" alt="周辺マップ">';document.getElementById("map-legend").innerHTML='<span><span class="dot" style="background:#009B3E"></span><b>P</b> 当駐車場</span>'+D.map.legend.map(l=>'<span><b>'+l.no+'.</b> '+l.name+(l.night?'（夜'+yen(l.night)+'）':'')+'</span>').join("");}
-// 周辺の最近の料金変更
-(function(){const el=document.getElementById("changes-card");if(!D.changes.length){el.innerHTML='<div style="color:var(--grey);font-size:13px">現時点で周辺の料金変更は検知されていません。<span style="color:var(--faint)">（周辺料金の継続収集により、変更が起きると自動で反映されます）</span></div>';return;}el.innerHTML='<table><thead><tr><th>日時</th><th>駐車場</th><th class="num">距離</th></tr></thead><tbody>'+D.changes.map(c=>'<tr><td>'+new Date(c.at).toLocaleDateString("ja-JP")+'</td><td>'+c.op+' '+(c.name||"")+'</td><td class="num">'+c.dist+'m</td></tr>').join("")+'</tbody></table>';})();
+if(D.map&&D.map.dataUri){const el=document.getElementById("map-card");el.style.display="";
+ document.getElementById("map-img").innerHTML='<img src="'+D.map.dataUri+'" style="width:100%;border-radius:8px;border:1px solid var(--line);display:block" alt="周辺マップ">';
+ document.getElementById("map-legend").innerHTML='<span><span class="dot" style="background:#009B3E"></span><b>P</b> 当駐車場</span>'+D.map.legend.map(l=>'<span><b>'+l.no+'.</b> '+esc(l.name)+(l.yph?'（'+yen(l.yph)+'/時）':'')+'</span>').join("");}
+// 最寄り比較
+(function(){const N=D.nearest||[];if(!N.length)return;
+document.getElementById("nearest-card").style.display="";
+const selfY=D.current.dayHour1;
+const med=(a=>{a=a.filter(x=>x!=null).sort((x,y)=>x-y);return a.length?a[a.length>>1]:null})(N.map(c=>c.yph));
+document.getElementById("nearest-c").innerHTML=selfY?('当駐車場の<b>'+yen(selfY)+'/時は'+(med&&selfY>med?'近隣で最高水準':'近隣比較')+'</b>（周辺中央値 約'+yen(med)+'/時）。'):'';
+let rows='';
+if(selfY)rows+='<tr class="hot"><td class="num">—</td><td style="font-weight:800">当駐車場（'+esc(D.park)+'）</td><td><span class="tag">自駐車場</span></td><td class="num">'+esc(D.current.unit||"")+'</td><td class="num" style="font-weight:800;color:#D0433A">'+yen(selfY)+(med&&selfY>med?' ⚠最高':'')+'</td></tr>';
+N.forEach(c=>{rows+='<tr><td class="num">'+(c.dist!=null?c.dist+'m':'—')+'</td><td>'+esc(c.name)+'</td><td><span class="tag">'+esc(c.op)+'</span></td><td class="num">'+esc(c.unit||"—")+'</td><td class="num">'+yen(c.yph)+'</td></tr>';});
+document.getElementById("tbl-nearest").innerHTML=rows;})();
+// 夜間最大比較
+(function(){const rows=[...(D.nightRows||[])].sort((a,b)=>b.v-a.v);if(rows.length<2)return;
+document.getElementById("night-card").style.display="";
+const selfRow=rows.find(r=>r.self);
+document.getElementById("night-c").innerHTML=selfRow?('夜間最大料金では当駐車場の<b>'+yen(selfRow.v)+(rows[rows.length-1].self?'が周辺で最安':'')+'</b>。実効満車のため夜間は値上げ余地が大きい。<span style="color:var(--faint)">※夜間最大は追跡対象の主要事業者の近隣物件から。単価の最寄り比較は上表。</span>'):'';
+const W=900,bh=26,gap=10,pL=250,pT=6,H=pT+rows.length*(bh+gap);
+const max=Math.max(...rows.map(r=>r.v))*1.1,sc=(W-pL-70)/max;
+let s='<svg viewBox="0 0 '+W+' '+H+'">';
+rows.forEach((d,i)=>{const y=pT+i*(bh+gap),w=d.v*sc;
+ s+='<text x="'+(pL-8)+'" y="'+(y+bh/2+4)+'" text-anchor="end" font-size="10.5" fill="'+(d.self?"#00622A":"#63685F")+'" font-weight="'+(d.self?800:500)+'">'+esc(d.n)+'</text><rect x="'+pL+'" y="'+y+'" width="'+w+'" height="'+bh+'" rx="3" fill="'+(d.self?"#D98200":"#B7DEC6")+'"/><text x="'+(pL+w+6)+'" y="'+(y+bh/2+4)+'" font-size="11.5" font-weight="800">'+yen(d.v)+'</text>';});
+if(D.nightTarget){const rx=pL+D.nightTarget*sc;s+='<line x1="'+rx+'" y1="0" x2="'+rx+'" y2="'+H+'" stroke="#009B3E" stroke-width="1.5" stroke-dasharray="4 3"/><text x="'+rx+'" y="'+(H-1)+'" text-anchor="middle" font-size="10" fill="#009B3E" font-weight="700">推奨 '+yen(D.nightTarget)+'</text>';}
+document.getElementById("c-night").innerHTML=s+"</svg>";})();
+// 提言
+document.getElementById("sec3-sub").textContent="車室"+EFF+"台"+(D.cap.blocked.length?"は物理上限で増やせない":"")+"。「夜は満車・日中は空きで割高」という構造に対する、価格のピークロード型レバー＋未回収の是正。";
+document.getElementById("recs").innerHTML=D.recs.map((r,i)=>'<div class="rec"><div class="n '+r.kind+'">'+(i+1)+'</div><div><div class="t">'+r.t+'</div><div class="d">'+r.d+'</div>'+(r.move?'<div class="move">'+(r.move.old?'<span class="old">'+esc(r.move.old)+'</span> → ':'')+'<span class="new">'+esc(r.move.new)+'</span>'+(r.move.pill?'<span class="pill">'+esc(r.move.pill)+'</span>':'')+'</div>':'')+'</div></div>').join("");
+document.getElementById("impact").innerHTML='<div style="font-size:12px;font-weight:700;color:var(--brand-dark)">推定インパクト</div><div class="big">月間売上 +'+yen(D.impact.lo)+'〜'+yen(D.impact.hi)+'（+'+up[0]+'〜'+up[1]+'%）</div>'+(D.unpaid.amount?'<div style="font-size:13px;color:var(--brand-dark);margin-top:4px">加えて未払い是正で最大 +'+yen(D.unpaid.amount)+'/月 の回収余地。</div>':'');
 </script>`;
