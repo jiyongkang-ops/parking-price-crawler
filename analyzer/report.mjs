@@ -61,7 +61,12 @@ export function buildRecommendations(metrics, nightComps, nearest, current) {
     lo = Math.round(metrics.revenue * share * upRate * 0.7);
     hi = Math.round(metrics.revenue * share * upRate);
   }
-  const impact = { lo, hi, pct: metrics.revenue ? [Math.round(100 * lo / metrics.revenue), Math.round(100 * hi / metrics.revenue)] : [0, 0] };
+  // 価格レバーが無い物件（満車でない等）は、未払い回収を増収余地として提示
+  let fromUnpaid = false;
+  if (!lo && !hi && metrics.unpaid.amount > 0) {
+    lo = Math.round(metrics.unpaid.amount * 0.5); hi = metrics.unpaid.amount; fromUnpaid = true;
+  }
+  const impact = { lo, hi, fromUnpaid, pct: metrics.revenue ? [Math.round(100 * lo / metrics.revenue), Math.round(100 * hi / metrics.revenue)] : [0, 0] };
   return { recs, impact, nightMed, nightTarget: r1?.target ?? null };
 }
 
@@ -132,8 +137,8 @@ const TEMPLATE = `<title>駐車場 料金診断</title>
     <div class="card"><p class="chart-t">時間帯別 稼働台数（平日・平均同時利用）</p><div id="c-occ"></div>
       <div class="legend"><span><span class="dot" style="background:var(--brand)"></span>稼働台数</span><span><span class="dot" style="background:var(--amber)"></span>入庫数</span></div></div>
     <div class="grid k2" style="margin-top:16px;">
-      <div class="card"><p class="chart-t">車室別 利用回数</p><div id="c-space"></div></div>
-      <div class="card"><p class="chart-t">料金階層の内訳</p><div id="c-fee"></div></div>
+      <div class="card" id="space-card"><p class="chart-t">車室別 利用回数</p><div id="c-space"></div></div>
+      <div class="card" id="fee-card"><p class="chart-t">料金階層の内訳</p><div id="c-fee"></div></div>
     </div>
     <div class="grid k2" style="margin-top:16px;">
       <div class="card"><p class="chart-t">時間帯別 売上構成（入庫時刻ベース）</p><p class="chart-c" id="revband-c"></p><div id="c-revband"></div></div>
@@ -194,8 +199,10 @@ const bw=pw/24*.6;O.forEach((v,i)=>{const h=ph*Math.min(1,v/EFF);s+='<rect x="'+
 s+='<polyline points="'+E.map((v,i)=>x(i)+","+yE(v)).join(" ")+'" fill="none" stroke="#D98200" stroke-width="2.2"/>';
 for(let i=0;i<24;i+=2)s+='<text x="'+x(i)+'" y="'+(H-8)+'" text-anchor="middle" font-size="10" fill="#9AA096">'+i+'時</text>';
 document.getElementById("c-occ").innerHTML=s+"</svg>";})();
-// 車室別
-(function(){const all=[];for(let n=1;n<=D.cap.nominal;n++)all.push([n,D.spaceUse[n]||0]);
+// 車室別（車室単位の記録がない場合＝ゲート式等は非表示）
+(function(){
+if(D.cap.spaceTracking===false){document.getElementById("space-card").style.display="none";document.getElementById("fee-card").style.gridColumn="span 2";return;}
+const all=[];for(let n=1;n<=D.cap.nominal;n++)all.push([n,D.spaceUse[n]||0]);
 const max=Math.max(...all.map(a=>a[1]),1);const W=440,bh=13,gap=4,pL=44,pT=4,H=pT+all.length*(bh+gap);
 let s='<svg viewBox="0 0 '+W+' '+H+'">';
 all.forEach(([k,v],i)=>{const y=pT+i*(bh+gap);const dead=v===0;
@@ -272,5 +279,5 @@ document.getElementById("c-night").innerHTML=s+"</svg>";})();
 // 提言
 document.getElementById("sec3-sub").textContent="車室"+EFF+"台"+(D.cap.blocked.length?"は物理上限で増やせない":"")+"。「夜は満車・日中は空きで割高」という構造に対する、価格のピークロード型レバー＋未回収の是正。";
 document.getElementById("recs").innerHTML=D.recs.map((r,i)=>'<div class="rec"><div class="n '+r.kind+'">'+(i+1)+'</div><div><div class="t">'+r.t+'</div><div class="d">'+r.d+'</div>'+(r.move?'<div class="move">'+(r.move.old?'<span class="old">'+esc(r.move.old)+'</span> → ':'')+'<span class="new">'+esc(r.move.new)+'</span>'+(r.move.pill?'<span class="pill">'+esc(r.move.pill)+'</span>':'')+'</div>':'')+'</div></div>').join("");
-document.getElementById("impact").innerHTML='<div style="font-size:12px;font-weight:700;color:var(--brand-dark)">推定インパクト</div><div class="big">月間売上 +'+yen(D.impact.lo)+'〜'+yen(D.impact.hi)+'（+'+up[0]+'〜'+up[1]+'%）</div>'+(D.unpaid.amount?'<div style="font-size:13px;color:var(--brand-dark);margin-top:4px">加えて未払い是正で最大 +'+yen(D.unpaid.amount)+'/月 の回収余地。</div>':'');
+document.getElementById("impact").innerHTML='<div style="font-size:12px;font-weight:700;color:var(--brand-dark)">推定インパクト</div><div class="big">月間売上 +'+yen(D.impact.lo)+'〜'+yen(D.impact.hi)+'（+'+up[0]+'〜'+up[1]+'%）</div>'+(D.impact.fromUnpaid?'<div style="font-size:13px;color:var(--brand-dark);margin-top:4px">満車帯が無く価格レバーは限定的なため、未払い是正（回収）を主レバーとした試算。</div>':(D.unpaid.amount?'<div style="font-size:13px;color:var(--brand-dark);margin-top:4px">加えて未払い是正で最大 +'+yen(D.unpaid.amount)+'/月 の回収余地。</div>':''));
 </script>`;

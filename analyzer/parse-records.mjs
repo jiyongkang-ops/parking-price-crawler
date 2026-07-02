@@ -28,34 +28,42 @@ const parseDate = (s) => {
 };
 const durMin = (s) => { const m = s && s.match(/(\d+):(\d+)/); return m ? +m[1] * 60 + +m[2] : 0; };
 
+// csvPath は文字列 or 配列（複数ファイルをマージ。例: 本体＋別区画）
 export function parseRecords(csvPath, { capacity = null } = {}) {
-  const raw = decode(fs.readFileSync(csvPath)).split(/\r?\n/).filter(Boolean);
-  const header = parseCsvLine(raw[0]).map((h) => h.replace(/^﻿/, ""));
-  const ix = (n) => header.indexOf(n);
-  const col = { space: ix("車室名"), in: ix("入庫時間"), out: ix("出庫時間"), dur: ix("駐車時間"), fee: ix("利用料金"), paid: ix("決済金額"), status: ix("ステータス"), name: ix("駐車場名") };
-
-  const colPlate = ["地名", "分類番号", "判別文字", "登録番号"].map((n) => ix(n));
-  const recs = raw.slice(1).map(parseCsvLine).map((a) => ({
-    space: +a[col.space] || 0,
-    in: parseDate(a[col.in]), out: parseDate(a[col.out]),
-    durM: durMin(a[col.dur]), fee: +a[col.fee] || 0, paid: +a[col.paid] || 0,
-    status: a[col.status] || "",
-    plate: colPlate.map((i) => (i >= 0 ? (a[i] || "").trim() : "")).join(" ").trim(),
-  })).filter((r) => r.in);
-
-  const parkName = raw[1] ? parseCsvLine(raw[1])[col.name] : "";
+  const paths = Array.isArray(csvPath) ? csvPath : [csvPath];
+  let recs = [];
+  let parkName = "";
+  for (const p of paths) {
+    const raw = decode(fs.readFileSync(p)).split(/\r?\n/).filter(Boolean);
+    const header = parseCsvLine(raw[0]).map((h) => h.replace(/^﻿/, ""));
+    const ix = (n) => header.indexOf(n);
+    const col = { space: ix("車室名"), in: ix("入庫時間"), out: ix("出庫時間"), dur: ix("駐車時間"), fee: ix("利用料金"), paid: ix("決済金額"), status: ix("ステータス"), name: ix("駐車場名") };
+    const colPlate = ["地名", "分類番号", "判別文字", "登録番号"].map((n) => ix(n));
+    recs = recs.concat(raw.slice(1).map(parseCsvLine).map((a) => ({
+      space: +a[col.space] || 0,
+      in: parseDate(a[col.in]), out: parseDate(a[col.out]),
+      durM: durMin(a[col.dur]), fee: +a[col.fee] || 0, paid: +a[col.paid] || 0,
+      status: a[col.status] || "",
+      plate: colPlate.map((i) => (i >= 0 ? (a[i] || "").trim() : "")).join(" ").trim(),
+    })).filter((r) => r.in));
+    if (!parkName && raw[1]) parkName = parseCsvLine(raw[1])[col.name] || "";
+  }
+  parkName = (parkName || "").replace(/\s*\d+車室$/, ""); // 「◯◯ 2車室」→「◯◯」
   let minD = null, maxD = null;
   recs.forEach((r) => { if (!minD || r.in < minD) minD = r.in; if (!maxD || r.in > maxD) maxD = r.in; });
   const days = Math.max(1, Math.round((maxD - minD) / 864e5) + 1);
 
   // 車室別利用（封鎖=0回を検知）
+  // ※ゲート式等で車室名が「-」の場合は車室単位の記録がない → 封鎖検知は行わない
   const spaceUse = {};
   recs.forEach((r) => { if (r.space) spaceUse[r.space] = (spaceUse[r.space] || 0) + 1; });
   const usedSpaces = Object.keys(spaceUse).map(Number).sort((a, b) => a - b);
   const maxSpaceNo = usedSpaces.length ? Math.max(...usedSpaces) : 0;
+  const numericShare = recs.filter((r) => r.space > 0).length / Math.max(1, recs.length);
+  const spaceTracking = numericShare >= 0.9 && usedSpaces.length >= 3;
   const nominalCapacity = capacity ?? maxSpaceNo; // 指定が無ければ最大車室番号
   const blocked = [];
-  for (let n = 1; n <= nominalCapacity; n++) if (!spaceUse[n]) blocked.push(n);
+  if (spaceTracking) for (let n = 1; n <= nominalCapacity; n++) if (!spaceUse[n]) blocked.push(n);
   const effectiveCapacity = nominalCapacity - blocked.length;
 
   const isWeekend = (d) => d.getDay() === 0 || d.getDay() === 6;
@@ -167,7 +175,7 @@ export function parseRecords(csvPath, { capacity = null } = {}) {
     revenue: collected,
     avgDurationMin: Math.round(recs.filter((r) => r.durM).reduce((s, r) => s + r.durM, 0) / Math.max(1, recs.filter((r) => r.durM).length)),
     unpaid: { count: unpaid.length, amount: unpaidAmt, rate: +(100 * unpaid.length / recs.length).toFixed(1) },
-    capacity: { nominal: nominalCapacity, effective: effectiveCapacity, blocked },
+    capacity: { nominal: nominalCapacity, effective: effectiveCapacity, blocked, spaceTracking },
     peak: { max: peakMax, fullNights, nights: peaks.length },
     spaceUse,
     hourly: {
