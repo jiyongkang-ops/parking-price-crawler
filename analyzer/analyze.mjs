@@ -10,11 +10,11 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
 import { parseRecords } from "./parse-records.mjs";
 import { crawlerCompetitors, parkopediaCompetitors, recentPriceChanges } from "./competitors.mjs";
 import { renderReport } from "./report.mjs";
 import { staticMapDataUri } from "./map.mjs";
+import { printToPdf } from "./pdf.mjs";
 
 const cfgPath = process.argv[2];
 if (!cfgPath) { console.error("使い方: node analyzer/analyze.mjs <config.json> [--pdf]"); process.exit(1); }
@@ -58,11 +58,9 @@ fs.writeFileSync(out, html);
 console.log(`[出力] ${out}`);
 
 if (wantPdf) {
-  const chrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
   const pdf = out.replace(/\.html$/, ".pdf");
   try {
-    execFileSync(chrome, ["--headless=new", "--disable-gpu", "--no-pdf-header-footer",
-      "--virtual-time-budget=5000", `--print-to-pdf=${pdf}`, `file://${out}`], { stdio: "ignore" });
+    await printToPdf(out, pdf); // ページ番号つき（CDP経由）
     console.log(`[PDF] ${pdf}`);
   } catch (e) { console.error("PDF生成に失敗（Chrome未検出?）:", e.message); }
 }

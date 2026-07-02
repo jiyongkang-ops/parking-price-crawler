@@ -29,8 +29,11 @@ export function buildRecommendations(metrics, nightComps, nearest, current) {
     let d = `夜間は実効満車（キャパ上限）。供給を増やせない以上、価格が唯一のレバー。売上の主軸である最大料金階層を段階的に引き上げる。`;
     if (nightMed && current.nightMax < nightMed) d = `夜間は実効満車かつ周辺で最安クラス（周辺中央値 約${yen(nightMed)}）。${d}`;
     if (slackDays.length && slackDays.length < 7) d += `<b>曜日別では${slackDays.join("・")}曜夜のみ空きがある</b>ため、値上げは他曜日に適用し${slackDays.join("・")}曜夜は据え置きが安全。`;
+    const upRate = (target - current.nightMax) / current.nightMax;
     recs.push({ kind: "g", t: "夜間の時間帯最大を引き上げる", d,
-      move: { old: `夜間最大 ${yen(current.nightMax)}`, new: yen(target), pill: `+${up}%` }, target });
+      move: { old: `夜間最大 ${yen(current.nightMax)}`, new: yen(target), pill: `+${up}%` }, target,
+      effect: { lo: Math.round(metrics.revenue * 0.7 * upRate * 0.7), hi: Math.round(metrics.revenue * 0.7 * upRate) },
+      effectNote: "最大料金階層への反映（稼働減を織込み）" });
   }
   // ② 日中値下げ
   const dayAvg = metrics.dayCurve.find((x) => x.label === "2-3h")?.avgFee ?? metrics.dayCurve.at(-1)?.avgFee;
@@ -39,7 +42,8 @@ export function buildRecommendations(metrics, nightComps, nearest, current) {
     let d = "日中は割高で稼働が低い。短時間単価と日中最大を周辺並みに下げ、流出している日中需要を取り込む。";
     if (selfYph && nearestYphMed) d = `当駐車場の${yen(selfYph)}/時は近隣最高水準（周辺中央値 約${yen(nearestYphMed)}/時）。` + d;
     recs.push({ kind: "a", t: "日中を値下げして空き時間を埋める", d,
-      move: dayMedComp ? { old: `日中 約${yen(dayAvg)}`, new: `約${yen(dayMedComp)}` } : null });
+      move: dayMedComp ? { old: `日中 約${yen(dayAvg)}`, new: `約${yen(dayMedComp)}` } : null,
+      effect: null, effectNote: "稼働改善は検証型のため試算外（上振れ要因）" });
   }
   // ③ 未払い是正（ナンバーベース）
   const P = metrics.plates;
@@ -49,24 +53,18 @@ export function buildRecommendations(metrics, nightComps, nearest, current) {
     if (P?.paidElsewhere) d += `<b>支払い実績のある${P.paidElsewhere}台</b>は回収余地あり。`;
     d += "加えて深夜〜早朝出庫の取りはぐれ対策。";
     recs.push({ kind: "a", t: "未払い（未回収）の是正", d,
-      move: { new: `未回収 月約${yen(metrics.unpaid.amount)} の圧縮` } });
+      move: { new: `未回収 月約${yen(metrics.unpaid.amount)} の圧縮` },
+      effect: { lo: Math.round(metrics.unpaid.amount * 0.5), hi: metrics.unpaid.amount },
+      effectNote: "回収率50〜100%想定" });
   }
 
-  // 増収試算
-  let lo = 0, hi = 0;
+  // 増収試算（施策別の期待効果と合計）
+  const rows = recs.map((r) => ({ t: r.t, lo: r.effect?.lo ?? null, hi: r.effect?.hi ?? null, note: r.effectNote ?? "" }));
+  const totalLo = rows.reduce((s, r) => s + (r.lo ?? 0), 0);
+  const totalHi = rows.reduce((s, r) => s + (r.hi ?? 0), 0);
+  const impact = { rows, lo: totalLo, hi: totalHi,
+    pct: metrics.revenue ? [Math.round(100 * totalLo / metrics.revenue), Math.round(100 * totalHi / metrics.revenue)] : [0, 0] };
   const r1 = recs.find((r) => r.target);
-  if (r1 && current.nightMax) {
-    const share = 0.7;
-    const upRate = (r1.target - current.nightMax) / current.nightMax;
-    lo = Math.round(metrics.revenue * share * upRate * 0.7);
-    hi = Math.round(metrics.revenue * share * upRate);
-  }
-  // 価格レバーが無い物件（満車でない等）は、未払い回収を増収余地として提示
-  let fromUnpaid = false;
-  if (!lo && !hi && metrics.unpaid.amount > 0) {
-    lo = Math.round(metrics.unpaid.amount * 0.5); hi = metrics.unpaid.amount; fromUnpaid = true;
-  }
-  const impact = { lo, hi, fromUnpaid, pct: metrics.revenue ? [Math.round(100 * lo / metrics.revenue), Math.round(100 * hi / metrics.revenue)] : [0, 0] };
   return { recs, impact, nightMed, nightTarget: r1?.target ?? null };
 }
 
@@ -125,7 +123,7 @@ const TEMPLATE = `<title>駐車場 料金診断</title>
   .unpaid-card{border-left:3px solid var(--amber);} .unpaid-card .chart-t{color:#9A5B00;}
   .hbar{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:12px;} .hbar .l{width:92px;color:var(--grey);} .hbar .track{flex:1;background:#EEF1EE;border-radius:4px;} .hbar .fill{height:14px;border-radius:4px;} .hbar .v{width:150px;text-align:right;font-variant-numeric:tabular-nums;}
   svg{display:block;width:100%;height:auto;overflow:visible;}
-  @page{margin:12mm;} @media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}body{background:#fff;}.card,.kpi,.callout,.flag,.rec{break-inside:avoid;}.section{break-inside:avoid-page;}}
+  @media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}body{background:#fff;}.card,.kpi,.callout,.flag,.rec{break-inside:avoid;}.section{break-inside:avoid-page;}}
 </style>
 <header><div class="wrap"><h1 id="h1"></h1><div class="h1sub">売上最大化のための料金診断</div><div class="meta" id="meta"></div></div></header>
 <div class="wrap">
@@ -277,7 +275,18 @@ rows.forEach((d,i)=>{const y=pT+i*(bh+gap),w=d.v*sc;
 if(D.nightTarget){const rx=pL+D.nightTarget*sc;s+='<line x1="'+rx+'" y1="0" x2="'+rx+'" y2="'+H+'" stroke="#009B3E" stroke-width="1.5" stroke-dasharray="4 3"/><text x="'+rx+'" y="'+(H-1)+'" text-anchor="middle" font-size="10" fill="#009B3E" font-weight="700">推奨 '+yen(D.nightTarget)+'</text>';}
 document.getElementById("c-night").innerHTML=s+"</svg>";})();
 // 提言
-document.getElementById("sec3-sub").textContent="車室"+EFF+"台"+(D.cap.blocked.length?"は物理上限で増やせない":"")+"。「夜は満車・日中は空きで割高」という構造に対する、価格のピークロード型レバー＋未回収の是正。";
+document.getElementById("sec3-sub").textContent=(D.peak.fullNights/Math.max(1,D.peak.nights)>=0.5)
+ ?("車室"+EFF+"台"+(D.cap.blocked.length?"は物理上限で増やせない":"")+"。「夜は満車・日中は空きで割高」という構造に対する、価格のピークロード型レバー＋未回収の是正。")
+ :"満車帯が無いため価格レバーは限定的。未回収の是正を主レバーとし、稼働改善は検証しながら進める。";
 document.getElementById("recs").innerHTML=D.recs.map((r,i)=>'<div class="rec"><div class="n '+r.kind+'">'+(i+1)+'</div><div><div class="t">'+r.t+'</div><div class="d">'+r.d+'</div>'+(r.move?'<div class="move">'+(r.move.old?'<span class="old">'+esc(r.move.old)+'</span> → ':'')+'<span class="new">'+esc(r.move.new)+'</span>'+(r.move.pill?'<span class="pill">'+esc(r.move.pill)+'</span>':'')+'</div>':'')+'</div></div>').join("");
-document.getElementById("impact").innerHTML='<div style="font-size:12px;font-weight:700;color:var(--brand-dark)">推定インパクト</div><div class="big">月間売上 +'+yen(D.impact.lo)+'〜'+yen(D.impact.hi)+'（+'+up[0]+'〜'+up[1]+'%）</div>'+(D.impact.fromUnpaid?'<div style="font-size:13px;color:var(--brand-dark);margin-top:4px">満車帯が無く価格レバーは限定的なため、未払い是正（回収）を主レバーとした試算。</div>':(D.unpaid.amount?'<div style="font-size:13px;color:var(--brand-dark);margin-top:4px">加えて未払い是正で最大 +'+yen(D.unpaid.amount)+'/月 の回収余地。</div>':''));
+// 推定インパクト（施策別の期待効果＋合計）
+(function(){
+const rows=D.impact.rows||[];
+let h='<div style="font-size:12px;font-weight:700;color:var(--brand-dark)">推定インパクト（月間・施策別）</div>';
+h+='<table style="margin-top:10px;background:transparent;"><thead><tr><th style="background:rgba(0,98,42,.08);">施策</th><th class="num" style="background:rgba(0,98,42,.08);">期待効果（月）</th><th style="background:rgba(0,98,42,.08);">前提</th></tr></thead><tbody>';
+rows.forEach((r,i)=>{h+='<tr><td>'+(i+1)+'. '+r.t+'</td><td class="num" style="font-weight:700;">'+(r.lo!=null?('+'+yen(r.lo)+'〜'+yen(r.hi)):'—')+'</td><td style="font-size:11.5px;color:var(--brand-dark);opacity:.8;">'+esc(r.note)+'</td></tr>';});
+h+='<tr><td style="font-weight:800;border-top:2px solid #B7E3C7;">合計</td><td class="num" style="font-weight:800;border-top:2px solid #B7E3C7;color:var(--brand-dark);">+'+yen(D.impact.lo)+'〜'+yen(D.impact.hi)+'</td><td style="border-top:2px solid #B7E3C7;font-weight:700;color:var(--brand-dark);">売上比 +'+up[0]+'〜'+up[1]+'%</td></tr></tbody></table>';
+h+='<div class="big" style="margin-top:10px;">月間売上 +'+yen(D.impact.lo)+'〜'+yen(D.impact.hi)+'（+'+up[0]+'〜'+up[1]+'%）</div>';
+document.getElementById("impact").innerHTML=h;
+})();
 </script>`;
