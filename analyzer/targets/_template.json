@@ -1,0 +1,10 @@
+{
+  "csv": "/Users/kangjiyong/Downloads/利用状況レポート_XXXX.csv",
+  "address": "東京都◯◯区◯◯1-2-3",
+  "lat": 35.0000, "lng": 139.0000,
+  "capacity": 10,
+  "radiusM": 400,
+  "nearestLimit": 12,
+  "current": { "unit": "12分440円", "nightMax": 1300, "dayMax": 2800, "dayHour1": 2200 },
+  "out": "reports/XXXX.html"
+}

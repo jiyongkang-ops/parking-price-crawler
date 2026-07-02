@@ -6,9 +6,9 @@
 ## 使い方
 
 ```bash
-# 1) 対象ごとの設定ファイルを作る（analyzer/targets/<name>.json）
-# 2) 実行（--pdf でPDFも生成）
-npm run analyze -- analyzer/targets/roppongi20.json --pdf
+# 1) analyzer/targets/_template.json をコピーして編集
+# 2) 実行（認証は analyzer/.pk-creds.sh から自動読込・PDFも生成）
+analyzer/run.sh analyzer/targets/<name>.json
 ```
 
 ### 設定ファイル（例）
@@ -25,7 +25,8 @@ npm run analyze -- analyzer/targets/roppongi20.json --pdf
 }
 ```
 
-- `capacity`：名目車室数（省略時は最大車室番号）。**利用0回の車室は「封鎖」として実効キャパを自動算出**。
+- `csv`：文字列 or **配列**（本体＋別区画など複数レポートをマージ可能）。
+- `capacity`：名目車室数（省略時は最大車室番号）。**利用0回の車室は「封鎖」として実効キャパを自動算出**。ゲート式等で車室名が「-」の場合は自動判定して車室別分析をスキップ。
 - `current`：当駐車場の現行料金（提言・比較の基準。分かる範囲でOK）。
 - `lat/lng`：地図座標（住所からの自動変換は未対応。Google Map等で取得して指定）。
 
