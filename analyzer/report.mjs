@@ -123,8 +123,8 @@ const TEMPLATE = `<title>駐車場 料金診断</title>
   header{color:#fff;padding:32px 0 28px;margin-bottom:24px;background:linear-gradient(135deg,#00622A,#009B3E);}
   header .wrap{padding-bottom:0;} header h1{font-size:25px;font-weight:800;margin:0;letter-spacing:-.01em;line-height:1.25;}
   .logo{margin-bottom:16px;} .logo svg{height:18px;width:auto;display:block;} .logo path,.logo polygon{fill:#fff;} .logo .lg2{fill:rgba(255,255,255,.82);}
-  .ic{width:14px;height:14px;vertical-align:-2px;margin-right:5px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:inline-block;}
-  .em svg{width:20px;height:20px;stroke:var(--brand-dark);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;} header .meta{font-size:13px;opacity:.92;display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;} header .meta b{font-weight:700;}
+  .ic{width:14px;height:14px;flex:0 0 14px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+  .em svg{width:20px;height:20px;stroke:var(--brand-dark);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;} header .meta{font-size:13px;opacity:.92;display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;} header .meta b{font-weight:700;} header .meta>span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
   .section{margin-top:28px;} .sec-h{display:flex;align-items:baseline;gap:12px;margin:0 0 4px;} .sec-h .no{color:var(--brand);font-weight:800;font-size:14px;} .sec-h h2{font-size:19px;font-weight:800;margin:0;}
   .sec-sub{color:var(--grey);font-size:13.5px;margin:2px 0 16px;padding-left:26px;}
   .card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:20px 22px;box-shadow:0 1px 2px rgba(0,0,0,.03);}
@@ -213,7 +213,7 @@ document.getElementById("meta").innerHTML=[
  IC.car+"<b>実効"+EFF+"車室"+(D.cap.blocked.length?"（"+D.cap.blocked.join("・")+"は封鎖）":"")+"</b>",
  IC.cal+"<b>"+D.period+"</b>（"+D.sessions.toLocaleString()+"回駐車）",
  D.current.unit&&IC.card+"現行 <b>"+esc(D.current.unit)+(D.current.nightMax?" / 夜間最大"+yen(D.current.nightMax):"")+"</b>",
-].filter(Boolean).join("");
+].filter(Boolean).map(v=>"<span>"+v+"</span>").join("");
 // KPI（実績 / 推定 を分離）
 const up=D.impact.pct;
 const kpiCard=k=>'<div class="kpi card '+k[3]+'"><div class="lbl">'+k[0]+'</div><div class="val tnum">'+k[1]+'</div><div class="sub">'+k[2]+'</div></div>';
