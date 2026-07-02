@@ -42,8 +42,12 @@ jobs:
           git add data/prices.jsonl data/repark-crawl-state.json data/repark-sitemap.xml dashboard.html data/parking-latest.csv
           if ! git diff --cached --quiet; then
             git commit -m "chore: update npc+repark prices ($(date -u +%Y-%m-%dT%H:%MZ))"
-            git pull --no-rebase --no-edit origin main
-            git push
+            for i in $(seq 1 6); do
+              git pull --no-rebase --no-edit origin main
+              if git push; then echo "pushed"; break; fi
+              echo "push retry $i"; sleep $((RANDOM % 8 + 3))
+              [ "$i" = 6 ] && { echo "push failed after retries"; exit 1; }
+            done
           else
             echo "変化なし。コミットしません。"
           fi
