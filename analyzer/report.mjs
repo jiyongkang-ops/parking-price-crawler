@@ -45,6 +45,17 @@ export function buildRecommendations(metrics, nightComps, nearest, current) {
       move: dayMedComp ? { old: `日中 約${yen(dayAvg)}`, new: `約${yen(dayMedComp)}` } : null,
       effect: null, effectNote: "稼働改善は検証型のため試算外（上振れ要因）" });
   }
+  // 価格レバーが発火しない場合は「料金設定は健全（現状維持）」を明示
+  if (!recs.length) {
+    const parts = [];
+    if (peakFullRate === 0) parts.push("満車となる時間帯が無く、値上げは稼働低下リスクが上回る");
+    if (selfYph && nearestYphMed && selfYph <= nearestYphMed) parts.push(`単価${yen(selfYph)}/時は周辺中央値（約${yen(nearestYphMed)}/時）を下回る水準で、割高感による流出懸念もない`);
+    if (nightMed && current.nightMax && current.nightMax <= nightMed) parts.push("夜間最大も周辺最安圏");
+    recs.push({ kind: "g", t: "料金設定は健全（現状維持を推奨）",
+      d: `現行料金は需要と釣り合っている。${parts.join("。")}。値上げ・値下げとも積極的な変更は推奨しない。日中ピークの稼働が恒常的に9割を超えるようになった時点で、日中最大の引き上げを検討する。`,
+      effect: null, effectNote: "現状維持（試算対象外）" });
+  }
+
   // ③ 未払い是正（ナンバーベース）
   const P = metrics.plates;
   if (metrics.unpaid.count > 0) {
@@ -54,6 +65,12 @@ export function buildRecommendations(metrics, nightComps, nearest, current) {
     d += "加えて深夜〜早朝出庫の取りはぐれ対策。";
     recs.push({ kind: "a", t: "未払い（未回収）の是正", d,
       move: { new: `未回収 月約${yen(metrics.unpaid.amount)} の圧縮` },
+      steps: [
+        "駐車場全体に「カメラによる未払い監視中」の掲示を増設（全体への抑止）",
+        "未払いの多い車両のナンバー（下4桁）を場内に警告表示",
+        "常習車両をブラックリストに登録し、入庫したタイミングでフロントガラスに警告書面を掲出",
+        "運輸局へ登録事項等証明書を請求して所有者を特定し、直接支払いを依頼",
+      ],
       effect: { lo: Math.round(metrics.unpaid.amount * 0.5), hi: metrics.unpaid.amount },
       effectNote: "回収率50〜100%想定" });
   }
@@ -279,7 +296,8 @@ document.getElementById("c-night").innerHTML=s+"</svg>";})();
 document.getElementById("sec3-sub").textContent=(D.peak.fullNights/Math.max(1,D.peak.nights)>=0.5)
  ?("車室"+EFF+"台"+(D.cap.blocked.length?"は物理上限で増やせない":"")+"。「夜は満車・日中は空きで割高」という構造に対する、価格のピークロード型レバー＋未回収の是正。")
  :"満車帯が無いため価格レバーは限定的。未回収の是正を主レバーとし、稼働改善は検証しながら進める。";
-document.getElementById("recs").innerHTML=D.recs.map((r,i)=>'<div class="rec"><div class="n '+r.kind+'">'+(i+1)+'</div><div><div class="t">'+r.t+'</div><div class="d">'+r.d+'</div>'+(r.move?'<div class="move">'+(r.move.old?'<span class="old">'+esc(r.move.old)+'</span> → ':'')+'<span class="new">'+esc(r.move.new)+'</span>'+(r.move.pill?'<span class="pill">'+esc(r.move.pill)+'</span>':'')+'</div>':'')+'</div></div>').join("");
+const CIRC=["①","②","③","④","⑤","⑥"];
+document.getElementById("recs").innerHTML=D.recs.map((r,i)=>'<div class="rec"><div class="n '+r.kind+'">'+(i+1)+'</div><div><div class="t">'+r.t+'</div><div class="d">'+r.d+'</div>'+(r.steps?'<div style="margin-top:8px;font-size:12.5px;"><div style="font-weight:700;color:var(--ink);margin-bottom:3px;">段階的な対応（推奨順）</div>'+r.steps.map((st,j)=>'<div style="margin:3px 0;color:var(--grey);"><b style="color:var(--amber);">'+CIRC[j]+'</b> '+esc(st)+'</div>').join("")+'</div>':'')+(r.move?'<div class="move">'+(r.move.old?'<span class="old">'+esc(r.move.old)+'</span> → ':'')+'<span class="new">'+esc(r.move.new)+'</span>'+(r.move.pill?'<span class="pill">'+esc(r.move.pill)+'</span>':'')+'</div>':'')+'</div></div>').join("");
 // 推定インパクト（施策別の期待効果＋合計）
 (function(){
 const rows=D.impact.rows||[];
