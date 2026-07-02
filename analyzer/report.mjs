@@ -104,7 +104,7 @@ export function renderReport(metrics, data, current = {}, opts = {}) {
     current, impact, nightTarget,
     occ: metrics.hourly.occWeekday, ent: metrics.hourly.entWeekday,
     spaceUse: metrics.spaceUse, maxTierCount: metrics.maxTierCount,
-    revBands: metrics.revenueBands, nightWindow: metrics.nightWindow, dow: metrics.dow,
+    revBands: metrics.revenueBands, nightWindow: metrics.nightWindow, dow: metrics.dow, weekly: metrics.weekly,
     plates: metrics.plates,
     nearest: nearest.map((c) => ({ name: c.name, op: c.opLabel, dist: c.dist, unit: c.unit, yph: c.yph })),
     nearestSource: data.nearestSource ?? "",
@@ -165,6 +165,8 @@ const TEMPLATE = `<title>駐車場 料金診断</title>
     <div class="concl" id="concl-1"></div>
     <div class="card"><p class="chart-t">時間帯別 稼働台数（平日・平均同時利用）</p><div id="c-occ"></div>
       <div class="legend"><span><span class="dot" style="background:var(--brand)"></span>稼働台数</span><span><span class="dot" style="background:var(--amber)"></span>入庫数</span></div></div>
+    <div class="card" style="margin-top:12px;" id="weekly-card"><p class="chart-t">期間中の推移（週次）</p><p class="chart-c" id="weekly-c"></p><div id="c-weekly"></div>
+      <div class="legend"><span><span class="dot" style="background:#009B3E"></span>週次売上</span><span><span class="dot" style="background:#D98200"></span>日次ピーク稼働の平均（台）</span></div></div>
     <div class="grid k2" style="margin-top:12px;">
       <div class="card" id="space-card"><p class="chart-t">車室別 利用回数</p><div id="c-space"></div></div>
       <div class="card" id="fee-card"><p class="chart-t">料金階層の内訳</p><div id="c-fee"></div></div>
@@ -241,6 +243,28 @@ const bw=pw/24*.6;O.forEach((v,i)=>{const h=ph*Math.min(1,v/EFF);s+='<rect x="'+
 s+='<polyline points="'+E.map((v,i)=>x(i)+","+yE(v)).join(" ")+'" fill="none" stroke="#D98200" stroke-width="2.2"/>';
 for(let i=0;i<24;i+=2)s+='<text x="'+x(i)+'" y="'+(H-8)+'" text-anchor="middle" font-size="10" fill="#9AA096">'+i+'時</text>';
 document.getElementById("c-occ").innerHTML=s+"</svg>";})();
+// 期間中の推移（週次: 売上バー + ピーク稼働ライン）
+(function(){
+const Wk=D.weekly||[];const card=document.getElementById("weekly-card");
+if(Wk.length<2){if(card)card.style.display="none";return;}
+const fulls=Wk.filter(w=>w.days>=6);
+let trend="";
+if(fulls.length>=2){const a=fulls[0].revenue,b=fulls[fulls.length-1].revenue;const g=a?Math.round(100*(b-a)/a):0;
+ trend=(g>=10?"<b>導入後、利用は拡大中</b>（"+fulls[0].label+"→"+fulls[fulls.length-1].label+"で売上+"+g+"%）。":(g<=-10?"<b>直近は減速傾向</b>（"+fulls[0].label+"→"+fulls[fulls.length-1].label+"で売上"+g+"%）。":"<b>売上はおおむね横ばいで安定</b>（週次±10%以内）。"));}
+document.getElementById("weekly-c").innerHTML=trend;
+const W=880,H=200,pL=56,pR=44,pB=24,pT=14,pw=W-pL-pR,ph=H-pB-pT;
+const maxR=Math.max(...Wk.map(w=>w.revenue),1);const cw=pw/Wk.length;const bx=i=>pL+i*cw+cw*0.15,bw=cw*0.7;
+let s2='<svg viewBox="0 0 '+W+' '+H+'">';
+for(let g=0;g<=3;g++){const gy=pT+ph*(1-g/3);s2+='<line x1="'+pL+'" y1="'+gy+'" x2="'+(W-pR)+'" y2="'+gy+'" stroke="rgba(0,0,0,.06)"/>';}
+Wk.forEach((w,i)=>{const h=ph*(w.revenue/maxR);
+ s2+='<rect x="'+bx(i)+'" y="'+(pT+ph-h)+'" width="'+bw+'" height="'+h+'" rx="2" fill="#009B3E" opacity="'+(w.days<6?0.45:0.9)+'"/>';
+ s2+='<text x="'+(bx(i)+bw/2)+'" y="'+(pT+ph-h-5)+'" text-anchor="middle" font-size="10" font-weight="700" fill="#1B1E1C">'+yen(w.revenue)+'</text>';
+ s2+='<text x="'+(bx(i)+bw/2)+'" y="'+(H-8)+'" text-anchor="middle" font-size="10" fill="#9AA096">'+w.label+(w.days<6?"(途中)":"")+'</text>';});
+const py=v=>pT+ph*(1-Math.min(1,v/EFF));
+s2+='<polyline points="'+Wk.map((w,i)=>(bx(i)+bw/2)+","+py(w.peakAvg||0)).join(" ")+'" fill="none" stroke="#D98200" stroke-width="2.2"/>';
+Wk.forEach((w,i)=>{s2+='<circle cx="'+(bx(i)+bw/2)+'" cy="'+py(w.peakAvg||0)+'" r="3" fill="#D98200"/><text x="'+(bx(i)+bw/2+7)+'" y="'+(py(w.peakAvg||0)-6)+'" font-size="10" fill="#D98200" font-weight="700">'+(w.peakAvg==null?"":w.peakAvg+"台")+'</text>';});
+document.getElementById("c-weekly").innerHTML=s2+"</svg>";
+})();
 // 車室別（車室単位の記録がない場合＝ゲート式等は非表示）
 (function(){
 if(D.cap.spaceTracking===false){document.getElementById("space-card").style.display="none";document.getElementById("fee-card").style.gridColumn="span 2";return;}

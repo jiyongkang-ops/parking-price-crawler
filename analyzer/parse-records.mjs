@@ -162,6 +162,32 @@ export function parseRecords(csvPath, { capacity = null } = {}) {
   const plates = { uniqueVehicles: unPlates.size, repeats, repeatIncidents, repeatAmount,
     paidElsewhere, neverPaid, onceOnly, example: bestExample };
 
+  // 週次推移（導入後の立ち上がり分析用）: 期間開始から7日刻み
+  const weekly = [];
+  {
+    const start = new Date(minD.getFullYear(), minD.getMonth(), minD.getDate());
+    // 日次ピーク稼働（全時間帯）
+    const dailyPeak = {};
+    for (let t = new Date(start); t <= maxD; t = new Date(t.getTime() + 3600e3)) {
+      let occ = 0; for (const r of recs) if (r.out && r.in <= t && t < r.out) occ++;
+      const k = t.toDateString(); dailyPeak[k] = Math.max(dailyPeak[k] || 0, occ);
+    }
+    for (let w = 0; ; w++) {
+      const from = new Date(start.getTime() + w * 7 * 864e5);
+      if (from > maxD) break;
+      const to = new Date(Math.min(from.getTime() + 7 * 864e5, maxD.getTime() + 864e5));
+      const g = recs.filter((r) => r.in >= from && r.in < to);
+      const days = Math.max(1, Math.round((to - from) / 864e5));
+      let peakSum = 0, peakCnt = 0;
+      for (let d = new Date(from); d < to; d = new Date(d.getTime() + 864e5)) {
+        const k = d.toDateString(); if (dailyPeak[k] != null) { peakSum += dailyPeak[k]; peakCnt++; }
+      }
+      weekly.push({ label: `${from.getMonth() + 1}/${from.getDate()}週`, days,
+        sessions: g.length, revenue: g.reduce((s2, r) => s2 + r.paid, 0),
+        peakAvg: peakCnt ? +(peakSum / peakCnt).toFixed(1) : null });
+    }
+  }
+
   // 日中実効料金（入庫8-16時・同日20時前出庫）
   const dayS = recs.filter((r) => r.out && r.in.getHours() >= 8 && r.in.getHours() <= 16 && r.out.getHours() < 20 && r.out.getDate() === r.in.getDate() && r.fee > 0);
   const dayCurve = [[0, 60, "〜1h"], [60, 120, "1-2h"], [120, 180, "2-3h"], [180, 999, "3h+"]].map(([lo, hi, lbl]) => {
@@ -186,6 +212,6 @@ export function parseRecords(csvPath, { capacity = null } = {}) {
     feeTiers: Object.entries(feeCount).map(([f, c]) => ({ fee: +f, count: c })).sort((a, b) => a.fee - b.fee),
     maxTierCount,
     dayCurve,
-    revenueBands, nightWindow, dow, plates,
+    revenueBands, nightWindow, dow, plates, weekly,
   };
 }
