@@ -260,7 +260,7 @@ document.getElementById("c-occ").innerHTML=s+"</svg>";})();
 // 期間中の推移（週次: 売上バー + ピーク稼働ライン）
 (function(){
 const useMonthly=(D.monthly||[]).filter(m=>m.days>=(m.fullDays||28)*0.8).length>=3;
-const Wk=useMonthly?D.monthly:(D.weekly||[]);const card=document.getElementById("weekly-card");
+const Wk=useMonthly?(D.monthly||[]).filter(m=>m.days>=(m.fullDays||28)*0.8):(D.weekly||[]);const card=document.getElementById("weekly-card");
 if(Wk.length<2){if(card)card.style.display="none";return;}
 card.querySelector(".chart-t").textContent=useMonthly?"導入後の売上推移（月次）":"期間中の推移（週次）";
 const isFull=w=>useMonthly?w.days>=(w.fullDays||28)*0.8:w.days>=6;
@@ -369,7 +369,7 @@ document.getElementById("recs").innerHTML=D.recs.map((r,i)=>'<div class="rec"><d
 // 推定インパクト（施策別の期待効果＋合計）
 (function(){
 const rows=D.impact.rows||[];
-if(D.impact.suppressed){document.getElementById("impact").innerHTML='<div style="font-size:12px;font-weight:700;color:var(--brand-dark)">推定インパクト</div><div style="font-size:14px;color:var(--brand-dark);margin-top:6px;"><b>増収余地は売上比5%未満</b>のため、積極的な料金変更・追加施策は提案しない。現行の料金・運用の継続を推奨。</div>';return;}
+if(D.impact.suppressed){document.getElementById("impact").style.display="none";return;}
 let h='<div style="font-size:12px;font-weight:700;color:var(--brand-dark)">推定インパクト（月間・施策別）</div>';
 h+='<table style="margin-top:10px;background:transparent;"><thead><tr><th style="background:rgba(0,98,42,.08);">施策</th><th class="num" style="background:rgba(0,98,42,.08);">期待効果（月）</th><th style="background:rgba(0,98,42,.08);">前提</th></tr></thead><tbody>';
 rows.forEach((r,i)=>{h+='<tr><td>'+(i+1)+'. '+r.t+'</td><td class="num" style="font-weight:700;">'+(r.lo!=null?('+'+yen(r.lo)+'〜'+yen(r.hi)):'—')+'</td><td style="font-size:11.5px;color:var(--brand-dark);opacity:.8;">'+esc(r.note)+'</td></tr>';});
