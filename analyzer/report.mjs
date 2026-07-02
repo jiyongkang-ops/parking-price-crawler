@@ -78,13 +78,23 @@ export function buildRecommendations(metrics, nightComps, nearest, current) {
   }
 
   // 増収試算（施策別の期待効果と合計）
-  const rows = recs.map((r) => ({ t: r.t, lo: r.effect?.lo ?? null, hi: r.effect?.hi ?? null, note: r.effectNote ?? "" }));
-  const totalLo = rows.reduce((s, r) => s + (r.lo ?? 0), 0);
-  const totalHi = rows.reduce((s, r) => s + (r.hi ?? 0), 0);
-  const impact = { rows, lo: totalLo, hi: totalHi,
+  let rows = recs.map((r) => ({ t: r.t, lo: r.effect?.lo ?? null, hi: r.effect?.hi ?? null, note: r.effectNote ?? "" }));
+  let totalLo = rows.reduce((s, r) => s + (r.lo ?? 0), 0);
+  let totalHi = rows.reduce((s, r) => s + (r.hi ?? 0), 0);
+  // 増収余地が売上比5%未満なら、増収提案はしない（現状維持のみ）
+  let outRecs = recs;
+  const suppressed = !!mRev && totalHi / mRev < 0.05;
+  if (suppressed) {
+    outRecs = recs.filter((r) => r.t.startsWith("料金設定は健全"));
+    if (!outRecs.length) outRecs = [{ kind: "g", t: "料金設定は健全（現状維持を推奨）",
+      d: "想定される増収余地が売上比5%未満と小さいため、積極的な料金変更・追加施策は提案しない。現行運用の継続を推奨する。",
+      effect: null, effectNote: "現状維持" }];
+    rows = []; totalLo = 0; totalHi = 0;
+  }
+  const impact = { rows, lo: totalLo, hi: totalHi, suppressed,
     pct: mRev ? [Math.round(100 * totalLo / mRev), Math.round(100 * totalHi / mRev)] : [0, 0] };
-  const r1 = recs.find((r) => r.target);
-  return { recs, impact, nightMed, nightTarget: r1?.target ?? null };
+  const r1 = outRecs.find((r) => r.target);
+  return { recs: outRecs, impact, nightMed, nightTarget: r1?.target ?? null };
 }
 
 // metrics: parseRecords の結果 / data: { nearest[], nearestSource, nightComps[], map, changes }
@@ -223,6 +233,7 @@ const up=D.impact.pct;
 const kpiCard=k=>'<div class="kpi card '+k[3]+'"><div class="lbl">'+k[0]+'</div><div class="val tnum">'+k[1]+'</div><div class="sub">'+k[2]+'</div></div>';
 document.getElementById("kpi-actual-label").textContent="実績（"+D.period+"）";
 const multiM=(D.monthsSpan||1)>1.5;const mRev=D.revenueMonthly??D.revenue;
+if(D.impact.suppressed){const w=document.querySelector(".kpi-wrap");if(w){w.style.gridTemplateColumns="1fr";w.children[1].style.display="none";}}
 document.getElementById("kpis-actual").innerHTML=[
  multiM?["月平均売上",yen(mRev),"期間計 "+yen(D.revenue)+"・"+D.sessions.toLocaleString()+"件",""]:["月間売上",yen(D.revenue),D.sessions+"件・平均"+D.avgDur+"分",""],
  ["実効車室数",EFF+"<small>台</small>",D.cap.blocked.length?"車室"+D.cap.blocked.join("・")+"は封鎖":"全"+D.cap.nominal+"車室",""],
@@ -251,12 +262,12 @@ document.getElementById("c-occ").innerHTML=s+"</svg>";})();
 const useMonthly=(D.monthly||[]).filter(m=>m.days>=(m.fullDays||28)*0.8).length>=3;
 const Wk=useMonthly?D.monthly:(D.weekly||[]);const card=document.getElementById("weekly-card");
 if(Wk.length<2){if(card)card.style.display="none";return;}
-card.querySelector(".chart-t").textContent="期間中の推移（"+(useMonthly?"月次":"週次")+"）";
+card.querySelector(".chart-t").textContent=useMonthly?"導入後の売上推移（月次）":"期間中の推移（週次）";
 const isFull=w=>useMonthly?w.days>=(w.fullDays||28)*0.8:w.days>=6;
 const fulls=Wk.filter(isFull);
 let trend="";
 if(fulls.length>=2){const a=fulls[0].revenue,b=fulls[fulls.length-1].revenue;const g=a?Math.round(100*(b-a)/a):0;
- trend=(g>=10?"<b>利用は拡大傾向</b>（"+fulls[0].label+"→"+fulls[fulls.length-1].label+"で売上+"+g+"%）。":(g<=-10?"<b>直近は減速傾向</b>（"+fulls[0].label+"→"+fulls[fulls.length-1].label+"で売上"+g+"%）。":"<b>売上はおおむね横ばいで安定</b>（週次±10%以内）。"));}
+ trend=(g>=10?"<b>"+(useMonthly?"導入後、利用は拡大傾向":"利用は拡大傾向")+"</b>（"+fulls[0].label+"→"+fulls[fulls.length-1].label+"で売上+"+g+"%）。":(g<=-10?"<b>直近は減速傾向</b>（"+fulls[0].label+"→"+fulls[fulls.length-1].label+"で売上"+g+"%）。":"<b>売上はおおむね横ばいで安定</b>（週次±10%以内）。"));}
 document.getElementById("weekly-c").innerHTML=trend;
 const W=880,H=200,pL=56,pR=44,pB=24,pT=14,pw=W-pL-pR,ph=H-pB-pT;
 const maxR=Math.max(...Wk.map(w=>w.revenue),1);const cw=pw/Wk.length;const bx=i=>pL+i*cw+cw*0.15,bw=cw*0.7;
@@ -350,7 +361,7 @@ rows.forEach((d,i)=>{const y=pT+i*(bh+gap),w=d.v*sc;
 if(D.nightTarget){const rx=pL+D.nightTarget*sc;s+='<line x1="'+rx+'" y1="0" x2="'+rx+'" y2="'+H+'" stroke="#009B3E" stroke-width="1.5" stroke-dasharray="4 3"/><text x="'+rx+'" y="'+(H-1)+'" text-anchor="middle" font-size="10" fill="#009B3E" font-weight="700">推奨 '+yen(D.nightTarget)+'</text>';}
 document.getElementById("c-night").innerHTML=s+"</svg>";})();
 // 提言
-document.getElementById("sec3-sub").textContent=(D.peak.fullNights/Math.max(1,D.peak.nights)>=0.5)
+document.getElementById("sec3-sub").textContent=D.impact.suppressed?"現行の料金・運用が需要と釣り合っており、変更の必要はない。":(D.peak.fullNights/Math.max(1,D.peak.nights)>=0.5)
  ?("車室"+EFF+"台"+(D.cap.blocked.length?"は物理上限で増やせない":"")+"。「夜は満車・日中は空きで割高」という構造に対する、価格のピークロード型レバー＋未回収の是正。")
  :"満車帯が無いため価格レバーは限定的。未回収の是正を主レバーとし、稼働改善は検証しながら進める。";
 const CIRC=["①","②","③","④","⑤","⑥"];
@@ -358,6 +369,7 @@ document.getElementById("recs").innerHTML=D.recs.map((r,i)=>'<div class="rec"><d
 // 推定インパクト（施策別の期待効果＋合計）
 (function(){
 const rows=D.impact.rows||[];
+if(D.impact.suppressed){document.getElementById("impact").innerHTML='<div style="font-size:12px;font-weight:700;color:var(--brand-dark)">推定インパクト</div><div style="font-size:14px;color:var(--brand-dark);margin-top:6px;"><b>増収余地は売上比5%未満</b>のため、積極的な料金変更・追加施策は提案しない。現行の料金・運用の継続を推奨。</div>';return;}
 let h='<div style="font-size:12px;font-weight:700;color:var(--brand-dark)">推定インパクト（月間・施策別）</div>';
 h+='<table style="margin-top:10px;background:transparent;"><thead><tr><th style="background:rgba(0,98,42,.08);">施策</th><th class="num" style="background:rgba(0,98,42,.08);">期待効果（月）</th><th style="background:rgba(0,98,42,.08);">前提</th></tr></thead><tbody>';
 rows.forEach((r,i)=>{h+='<tr><td>'+(i+1)+'. '+r.t+'</td><td class="num" style="font-weight:700;">'+(r.lo!=null?('+'+yen(r.lo)+'〜'+yen(r.hi)):'—')+'</td><td style="font-size:11.5px;color:var(--brand-dark);opacity:.8;">'+esc(r.note)+'</td></tr>';});
@@ -383,6 +395,6 @@ if(selfN&&nr.length>1){const others=nr.filter(r=>!r.self).map(r=>r.v);if(selfN.v
 document.getElementById("concl-2").innerHTML='<b>結論：</b>'+(c2parts.length?c2parts.join("。")+"。":"周辺比較は下表参照。");
 // 03
 const first=(D.recs[0]||{}).t||"";
-document.getElementById("concl-3").innerHTML='<b>結論：'+first+(D.recs.length>1?'（ほか'+(D.recs.length-1)+'施策）':'')+'。</b>合計で月 +'+yen(D.impact.lo)+'〜'+yen(D.impact.hi)+'（+'+up[0]+'〜'+up[1]+'%）の増収余地。';
+document.getElementById("concl-3").innerHTML=D.impact.suppressed?'<b>結論：料金設定は健全（現状維持を推奨）。</b>増収余地は売上比5%未満で、積極的な変更は不要。':'<b>結論：'+first+(D.recs.length>1?'（ほか'+(D.recs.length-1)+'施策）':'')+'。</b>合計で月 +'+yen(D.impact.lo)+'〜'+yen(D.impact.hi)+'（+'+up[0]+'〜'+up[1]+'%）の増収余地。';
 })();
 </script>`;
