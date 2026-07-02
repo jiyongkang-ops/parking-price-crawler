@@ -37,10 +37,23 @@ export function buildRecommendations(metrics, nightComps, nearest, current) {
       effect: { lo: Math.round(mRev * 0.7 * upRate * 0.7), hi: Math.round(mRev * 0.7 * upRate) },
       effectNote: "最大料金階層への反映（稼働減を織込み）" });
   }
-  // ② 日中値下げ
+  // ①b 日中満車 → 日中/24時間最大の引き上げ
+  const dp = metrics.dayPeak;
+  const dayFull = dp && dp.days > 0 && dp.fullDays / dp.days >= 0.5;
+  if (dayFull && current.dayMax) {
+    const target = Math.round(current.dayMax * 1.15 / 100) * 100;
+    const upRate = (target - current.dayMax) / current.dayMax;
+    const share = Math.min(0.7, metrics.maxTierCount / Math.max(1, metrics.sessions));
+    recs.push({ kind: "g", t: "日中・24時間最大を引き上げる",
+      d: `日中（8-18時）は<b>${dp.days}日中${dp.fullDays}日（${Math.round(100 * dp.fullDays / dp.days)}%）で満車</b>。需要がキャパを上回っており、日中に効く最大料金の段階的な引き上げ余地がある。値上げ後の稼働をモニタリングしながら調整する。`,
+      move: { old: `最大 ${yen(current.dayMax)}`, new: yen(target), pill: `+${Math.round(upRate * 100)}%` }, target,
+      effect: { lo: Math.round(mRev * share * upRate * 0.7), hi: Math.round(mRev * share * upRate) },
+      effectNote: "最大料金到達層への反映（稼働減を織込み）" });
+  }
+  // ② 日中値下げ（日中満車の物件では出さない）
   const dayAvg = metrics.dayCurve.find((x) => x.label === "2-3h")?.avgFee ?? metrics.dayCurve.at(-1)?.avgFee;
   const selfYph = current.dayHour1 ?? null;
-  if ((selfYph && nearestYphMed && selfYph > nearestYphMed) || (dayAvg && dayMedComp && dayAvg > dayMedComp)) {
+  if (!dayFull && ((selfYph && nearestYphMed && selfYph > nearestYphMed) || (dayAvg && dayMedComp && dayAvg > dayMedComp))) {
     let d = "日中は割高で稼働が低い。短時間単価と日中最大を周辺並みに下げ、流出している日中需要を取り込む。";
     if (selfYph && nearestYphMed) d = `当駐車場の${yen(selfYph)}/時は近隣最高水準（周辺中央値 約${yen(nearestYphMed)}/時）。` + d;
     recs.push({ kind: "a", t: "日中を値下げして空き時間を埋める", d,
@@ -112,7 +125,7 @@ export function renderReport(metrics, data, current = {}, opts = {}) {
     park: metrics.parkName, address: opts.address ?? "",
     period: `${fmtDate(metrics.period.from)}–${fmtDate(metrics.period.to)}`,
     sessions: metrics.sessions, revenue: metrics.revenue, avgDur: metrics.avgDurationMin,
-    cap: metrics.capacity, peak: metrics.peak, unpaid: metrics.unpaid,
+    cap: metrics.capacity, peak: metrics.peak, dayPeak: metrics.dayPeak, unpaid: metrics.unpaid,
     current, impact, nightTarget,
     occ: metrics.hourly.occWeekday, ent: metrics.hourly.entWeekday,
     spaceUse: metrics.spaceUse, maxTierCount: metrics.maxTierCount,
@@ -361,7 +374,8 @@ rows.forEach((d,i)=>{const y=pT+i*(bh+gap),w=d.v*sc;
 if(D.nightTarget){const rx=pL+D.nightTarget*sc;s+='<line x1="'+rx+'" y1="0" x2="'+rx+'" y2="'+H+'" stroke="#009B3E" stroke-width="1.5" stroke-dasharray="4 3"/><text x="'+rx+'" y="'+(H-1)+'" text-anchor="middle" font-size="10" fill="#009B3E" font-weight="700">推奨 '+yen(D.nightTarget)+'</text>';}
 document.getElementById("c-night").innerHTML=s+"</svg>";})();
 // 提言
-document.getElementById("sec3-sub").textContent=D.impact.suppressed?"現行の料金・運用が需要と釣り合っており、変更の必要はない。":(D.peak.fullNights/Math.max(1,D.peak.nights)>=0.5)
+const dayFullS=D.dayPeak&&D.dayPeak.days>0&&D.dayPeak.fullDays/D.dayPeak.days>=0.5;
+document.getElementById("sec3-sub").textContent=D.impact.suppressed?"現行の料金・運用が需要と釣り合っており、変更の必要はない。":dayFullS?"日中に満車帯がある。日中に効く最大料金の引き上げが主レバー。":(D.peak.fullNights/Math.max(1,D.peak.nights)>=0.5)
  ?("車室"+EFF+"台"+(D.cap.blocked.length?"は物理上限で増やせない":"")+"。「夜は満車・日中は空きで割高」という構造に対する、価格のピークロード型レバー＋未回収の是正。")
  :"満車帯が無いため価格レバーは限定的。未回収の是正を主レバーとし、稼働改善は検証しながら進める。";
 const CIRC=["①","②","③","④","⑤","⑥"];
@@ -383,6 +397,7 @@ const full=D.peak.fullNights/Math.max(1,D.peak.nights);
 // 01
 let c1;
 if(full>=0.5){c1='<b>結論：夜間はほぼ満車（'+D.peak.nights+'夜中'+D.peak.fullNights+'夜）で、空きは日中にある。</b>夜間帯にかかる駐車が売上の'+D.nightWindow.share+'%を占め、夜間の料金設定が売上を左右する。';}
+else if(D.dayPeak&&D.dayPeak.days>0&&D.dayPeak.fullDays/D.dayPeak.days>=0.5){c1='<b>結論：日中（8-18時）は'+Math.round(100*D.dayPeak.fullDays/D.dayPeak.days)+'%の日で満車</b>（'+D.dayPeak.days+'日中'+D.dayPeak.fullDays+'日）。夜間に空きがあり、日中の料金設定が売上を左右する。';}
 else{c1='<b>結論：満車になる時間帯はなく、稼働に余裕がある。</b>ピークでも'+D.peak.max+'/'+EFF+'台で、料金よりも集客・回収が論点。';}
 document.getElementById("concl-1").innerHTML=c1;
 // 02

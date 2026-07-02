@@ -91,9 +91,20 @@ export function parseRecords(csvPath, { capacity = null } = {}) {
     let occ = 0; for (const r of recs) if (r.out && r.in <= t && t < r.out) occ++;
     const day = t.toDateString(); nightlyPeak[day] = Math.max(nightlyPeak[day] || 0, occ);
   }
+  // 日中（8-18時）の各日ピーク → 日中満車の検知（通勤・商業型の物件用）
+  const dailyDayPeak = {};
+  for (let t = new Date(minD.getFullYear(), minD.getMonth(), minD.getDate(), 8); t <= maxD; t = new Date(t.getTime() + 3600e3)) {
+    const hr = t.getHours(); if (hr < 8 || hr >= 18) continue;
+    let occ = 0; for (const r of recs) if (r.out && r.in <= t && t < r.out) occ++;
+    const k = t.toDateString(); dailyDayPeak[k] = Math.max(dailyDayPeak[k] || 0, occ);
+  }
   const peaks = Object.values(nightlyPeak).sort((a, b) => a - b);
   const peakMax = peaks.length ? Math.max(...peaks) : 0;
   const fullNights = peaks.filter((p) => p >= effectiveCapacity).length;
+  const dpeaks = Object.values(dailyDayPeak);
+  const dayPeakStats = { days: dpeaks.length,
+    fullDays: dpeaks.filter((p) => p >= effectiveCapacity).length,
+    max: dpeaks.length ? Math.max(...dpeaks) : 0 };
 
   // 料金階層
   const feeCount = {}; recs.forEach((r) => { feeCount[r.fee] = (feeCount[r.fee] || 0) + 1; });
@@ -219,6 +230,7 @@ export function parseRecords(csvPath, { capacity = null } = {}) {
     unpaid: { count: unpaid.length, amount: unpaidAmt, amountMonthly: unpaidMonthly, rate: +(100 * unpaid.length / recs.length).toFixed(1) },
     capacity: { nominal: nominalCapacity, effective: effectiveCapacity, blocked, spaceTracking },
     peak: { max: peakMax, fullNights, nights: peaks.length },
+    dayPeak: dayPeakStats,
     spaceUse,
     hourly: {
       occWeekday: hourlyOcc((d) => !isWeekend(d)),

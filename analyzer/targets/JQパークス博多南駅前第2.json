@@ -1,0 +1,18 @@
+{
+  "csv": [
+    "/Users/kangjiyong/Downloads/利用状況レポート_JQパークス博多南駅前第2_20260702.csv"
+  ],
+  "address": "福岡県春日市上白水8",
+  "lat": 33.518704,
+  "lng": 130.43617,
+  "capacity": 14,
+  "radiusM": 400,
+  "nearestLimit": 12,
+  "current": {
+    "unit": "40分100円",
+    "nightMax": 400,
+    "dayMax": 900,
+    "dayHour1": 200
+  },
+  "out": "reports/JQパークス博多南駅前第2.html"
+}
