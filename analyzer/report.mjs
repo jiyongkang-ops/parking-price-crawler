@@ -131,6 +131,14 @@ const TEMPLATE = `<title>駐車場 料金診断</title>
   .card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:20px 22px;box-shadow:0 1px 2px rgba(0,0,0,.03);}
   .grid{display:grid;gap:16px;} .k4{grid-template-columns:repeat(4,1fr);} .k2{grid-template-columns:1fr 1fr;}
   @media(max-width:720px){.k4{grid-template-columns:1fr 1fr;}.k2{grid-template-columns:1fr;}}
+  .kpi-wrap{display:grid;grid-template-columns:3fr 2fr;gap:16px;margin-bottom:16px;}
+  @media(max-width:880px){.kpi-wrap{grid-template-columns:1fr;}}
+  .kpi-glabel{font-size:12.5px;font-weight:800;letter-spacing:.05em;color:var(--grey);margin-bottom:8px;}
+  .kpi-glabel.est{color:var(--brand-dark);}
+  .k3{grid-template-columns:repeat(3,1fr);} .k2e{grid-template-columns:repeat(2,1fr);}
+  .kpi.est{background:var(--brand-light);border-color:#B7E3C7;}
+  .concl{background:var(--brand-light);border-left:3px solid var(--brand);border-radius:6px;padding:10px 14px;font-size:13.5px;margin:6px 0 14px;color:var(--ink);}
+  .concl b{color:var(--brand-dark);}
   .kpi{display:flex;flex-direction:column;} .kpi .lbl{font-size:11.5px;color:var(--grey);font-weight:700;white-space:nowrap;} .kpi .val{font-size:24px;font-weight:800;margin-top:5px;white-space:nowrap;letter-spacing:-.01em;} .kpi .val small{font-size:13px;color:var(--grey);font-weight:700;} .kpi .sub{font-size:11.5px;color:var(--faint);margin-top:auto;padding-top:6px;} .kpi.accent{border-left:3px solid var(--brand);}
   .chart-t{font-weight:700;font-size:14px;margin:0 0 3px;} .chart-c{color:var(--grey);font-size:12px;margin:0 0 14px;}
   .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--grey);margin-top:10px;} .legend span{display:inline-flex;align-items:center;gap:6px;} .dot{width:11px;height:11px;border-radius:3px;display:inline-block;}
@@ -147,11 +155,15 @@ const TEMPLATE = `<title>駐車場 料金診断</title>
 </style>
 <header><div class="wrap"><div class="logo"><svg viewBox="0 0 463.09 58.97" xmlns="http://www.w3.org/2000/svg" aria-label="AIMO Parking"><path d="M119.47,47.76l-2.12-5.66h-14.04l-2.24,5.66h-11.74l16.61-38.05h8.66l16.61,38.05h-11.74ZM110.55,24.14l-4.1,10.15h7.95l-3.85-10.15Z"/><path d="M138.52,47.76V9.71h11.22v38.05h-11.22Z"/><path d="M192.08,47.76v-18.22l-6.48,9.41h-7.18l-6.48-9.41v18.22h-11.22V9.71h11.03l10.26,16.78,10.26-16.78h11.03v38.05h-11.22Z"/><path d="M243.23,43.81c-3.33,2.78-7.18,4.28-12.76,4.28s-9.43-1.5-12.76-4.28c-4.81-4.01-4.62-9.35-4.62-15.07s-.19-11.06,4.62-15.07c3.33-2.78,7.18-4.28,12.76-4.28s9.43,1.5,12.76,4.28c4.81,4.01,4.62,9.35,4.62,15.07s.19,11.06-4.62,15.07ZM234.96,19.38c-.83-.91-2.44-1.66-4.49-1.66s-3.66.75-4.49,1.66c-1.03,1.12-1.67,2.41-1.67,9.35s.64,8.18,1.67,9.3c.83.91,2.44,1.71,4.49,1.71s3.66-.8,4.49-1.71c1.03-1.12,1.67-2.35,1.67-9.3s-.64-8.23-1.67-9.35Z"/><polygon points="80.79 57.47 0 57.47 0 0 80.37 0 80.37 9.71 9.71 9.71 9.71 47.76 80.79 47.76 80.79 57.47"/><path d="M57.44,28.52c0,8.07-6.55,14.62-14.62,14.62s-14.62-6.55-14.62-14.62,6.55-14.62,14.62-14.62,14.62,6.55,14.62,14.62ZM41.92,25.94v-5.42c0-.67-.55-1.23-1.23-1.23h-5.42c-.67,0-1.23.55-1.23,1.23v5.42c0,.67.55,1.23,1.23,1.23h5.42c.67,0,1.23-.55,1.23-1.23Z"/><path class="lg2" d="M272.61,48.08c-.34,0-.57-.23-.57-.57V10.08c0-.34.23-.57.57-.57h15.42c9.41,0,14.29,5.33,14.29,12.82s-4.93,12.87-14.29,12.87h-5.67c-.23,0-.34.11-.34.34v11.97c0,.34-.23.57-.57.57h-8.85ZM292.35,22.33c0-2.66-1.76-4.37-4.87-4.37h-5.1c-.23,0-.34.11-.34.34v8.11c0,.23.11.34.34.34h5.1c3.12,0,4.87-1.76,4.87-4.42Z"/><path class="lg2" d="M321.44,48.08c-.34,0-.57-.23-.57-.57v-1.59h-.06c-1.47,1.7-3.8,2.84-7.43,2.84-4.71,0-8.96-2.55-8.96-8.51s4.87-9.07,11.74-9.07h4.37c.23,0,.34-.11.34-.34v-.74c0-2.04-1.08-2.89-5.33-2.89-2.49,0-4.65.68-5.95,1.59-.29.17-.57.17-.74-.17l-2.95-5.22c-.17-.4-.11-.68.17-.91,2.49-1.7,6.18-2.72,10.72-2.72,9.64,0,13.04,3.23,13.04,10.32v17.41c0,.34-.23.57-.57.57h-7.83ZM320.87,39.01v-1.7c0-.23-.11-.34-.34-.34h-3.35c-2.55,0-3.86.91-3.86,2.61,0,1.53,1.08,2.38,3.23,2.38,2.95,0,4.31-.96,4.31-2.95Z"/><path class="lg2" d="M336.24,48.08c-.34,0-.57-.23-.57-.57v-26.48c0-.34.23-.57.57-.57h8.39c.34,0,.57.23.57.57v2.44h.06c1.3-2.44,3.91-3.69,7.15-3.69,1.53,0,2.95.4,3.8,1.08.34.17.4.34.29.74l-3.23,8c-.23.28-.45.23-.79.06-1.36-.85-2.72-1.25-4.02-1.08-2.21.17-3.23,1.87-3.23,4.82v14.12c0,.34-.23.57-.57.57h-8.39Z"/><path class="lg2" d="M377.75,48.08c-.4,0-.68-.17-.85-.57l-5.39-10.66-2.04,2.72v7.94c0,.34-.23.57-.57.57h-8.33c-.34,0-.57-.23-.57-.57V10.08c0-.34.23-.57.57-.57h8.33c.34,0,.57.23.57.57v19.4l6.47-8.45c.34-.4.62-.57,1.08-.57h8.68c.34,0,.45.34.23.57l-8.11,9.41,9.24,17.07c.17.28.06.57-.28.57h-9.02Z"/><path class="lg2" d="M391.19,16.89c-.34,0-.57-.23-.57-.57v-6.24c0-.34.23-.57.57-.57h8.39c.34,0,.57.23.57.57v6.24c0,.34-.23.57-.57.57h-8.39ZM391.19,48.08c-.34,0-.57-.23-.57-.57v-26.48c0-.34.23-.57.57-.57h8.39c.34,0,.57.23.57.57v26.48c0,.34-.23.57-.57.57h-8.39Z"/><path class="lg2" d="M423,48.08c-.34,0-.56-.23-.56-.57v-15.76c0-2.44-1.08-4.03-3.35-4.03s-3.4,1.53-3.4,4.03v15.76c0,.34-.23.57-.57.57h-8.39c-.34,0-.57-.23-.57-.57v-26.48c0-.34.23-.57.57-.57h8.39c.34,0,.57.23.57.57v1.99h.06c1.25-1.81,3.63-3.23,7.09-3.23,6.3,0,9.13,4.25,9.13,10.32v17.41c0,.34-.23.57-.57.57h-8.39Z"/><path class="lg2" d="M437.57,54.66c-.23-.28-.17-.57.06-.85l4.76-4.88c.29-.28.57-.28.85,0,1.64,1.36,3.29,2.21,5.44,2.21,3.4,0,4.88-1.76,4.88-5.61v-2.1h-.06c-1.19,1.99-3.63,3.23-7.03,3.23-4.54,0-7.65-2.27-9.07-6.63-.62-1.87-.91-3.91-.91-6.81s.29-4.88.91-6.81c1.42-4.31,4.54-6.63,9.07-6.63,3.4,0,5.84,1.3,7.03,3.29h.06v-2.04c0-.34.23-.57.57-.57h8.39c.34,0,.57.23.57.57v22.8c0,10.66-5.1,15.14-14.69,15.14-4.37,0-8.91-1.98-10.83-4.31ZM453.17,36.45c.23-.79.4-1.65.4-3.23s-.17-2.44-.4-3.23c-.51-1.59-1.53-2.38-3.34-2.38s-2.78.79-3.29,2.38c-.28.79-.4,1.7-.4,3.23s.11,2.44.4,3.23c.51,1.65,1.53,2.44,3.29,2.44s2.84-.79,3.34-2.44Z"/></svg></div><h1 id="h1"></h1><div class="h1sub">売上最大化のための料金診断</div><div class="meta" id="meta"></div></div></header>
 <div class="wrap">
-  <div class="grid k4" style="margin-bottom:16px;" id="kpis"></div>
+  <div class="kpi-wrap">
+    <div><div class="kpi-glabel" id="kpi-actual-label">実績</div><div class="grid k3" id="kpis-actual"></div></div>
+    <div><div class="kpi-glabel est">料金設計 反映後（推定）</div><div class="grid k2e" id="kpis-est"></div></div>
+  </div>
   <div class="flag" id="flag" style="display:none;"></div>
 
   <div class="section">
     <div class="sec-h"><span class="no">01</span><h2>いつ混み、いつ空くか</h2></div>
+    <div class="concl" id="concl-1"></div>
     <div class="card"><p class="chart-t">時間帯別 稼働台数（平日・平均同時利用）</p><div id="c-occ"></div>
       <div class="legend"><span><span class="dot" style="background:var(--brand)"></span>稼働台数</span><span><span class="dot" style="background:var(--amber)"></span>入庫数</span></div></div>
     <div class="grid k2" style="margin-top:16px;">
@@ -167,6 +179,7 @@ const TEMPLATE = `<title>駐車場 料金診断</title>
 
   <div class="section">
     <div class="sec-h"><span class="no">02</span><h2>混雑時／閑散時、周辺より高いか安いか</h2></div>
+    <div class="concl" id="concl-2"></div>
     <p class="sec-sub" id="sec2-sub">事業者を問わず、当駐車場から最寄りの駐車場を距離順に比較（公開料金を調査）。</p>
     <div class="card" id="map-card" style="display:none;margin-bottom:16px;"><p class="chart-t">周辺マップ（当駐車場と最寄り競合の位置）</p><div id="map-img"></div><div class="legend" id="map-legend" style="margin-top:10px;"></div></div>
     <div class="card" id="nearest-card" style="display:none;overflow-x:auto;"><p class="chart-t">最寄りの周辺駐車場（距離順・全事業者）— 料金比較</p><p class="chart-c" id="nearest-c"></p>
@@ -177,6 +190,7 @@ const TEMPLATE = `<title>駐車場 料金診断</title>
 
   <div class="section">
     <div class="sec-h"><span class="no">03</span><h2>売上最大化の料金設計</h2></div>
+    <div class="concl" id="concl-3"></div>
     <p class="sec-sub" id="sec3-sub"></p>
     <div class="card" id="recs"></div>
     <div class="callout" id="impact"></div>
@@ -201,14 +215,19 @@ document.getElementById("meta").innerHTML=[
  IC.cal+"<b>"+D.period+"</b>（"+D.sessions.toLocaleString()+"回駐車）",
  D.current.unit&&IC.card+"現行 <b>"+esc(D.current.unit)+(D.current.nightMax?" / 夜間最大"+yen(D.current.nightMax):"")+"</b>",
 ].filter(Boolean).join("");
-// KPI
+// KPI（実績 / 推定 を分離）
 const up=D.impact.pct;
-document.getElementById("kpis").innerHTML=[
- ["月間売上（実績）",yen(D.revenue),D.sessions+"件・平均"+D.avgDur+"分",""],
- ["実効車室数（上限）",EFF+"<small>台</small>",D.cap.blocked.length?"車室"+D.cap.blocked.join("・")+"は封鎖":"全"+D.cap.nominal+"車室",""],
- ["夜間ピーク稼働",D.peak.max+"<small>/"+EFF+"台</small>",D.peak.nights+"夜中"+D.peak.fullNights+"夜が満車","accent"],
- ["推定 増収余地","+"+up[0]+"–"+up[1]+"<small>%</small>","月 +"+yen(D.impact.lo)+"–"+yen(D.impact.hi).replace("¥",""),"accent"],
-].map(k=>'<div class="kpi card '+k[3]+'"><div class="lbl">'+k[0]+'</div><div class="val tnum">'+k[1]+'</div><div class="sub">'+k[2]+'</div></div>').join("");
+const kpiCard=k=>'<div class="kpi card '+k[3]+'"><div class="lbl">'+k[0]+'</div><div class="val tnum">'+k[1]+'</div><div class="sub">'+k[2]+'</div></div>';
+document.getElementById("kpi-actual-label").textContent="実績（"+D.period+"）";
+document.getElementById("kpis-actual").innerHTML=[
+ ["月間売上",yen(D.revenue),D.sessions+"件・平均"+D.avgDur+"分",""],
+ ["実効車室数",EFF+"<small>台</small>",D.cap.blocked.length?"車室"+D.cap.blocked.join("・")+"は封鎖":"全"+D.cap.nominal+"車室",""],
+ ["夜間ピーク稼働",D.peak.max+"<small>/"+EFF+"台</small>",D.peak.nights+"夜中"+D.peak.fullNights+"夜が満車",""],
+].map(kpiCard).join("");
+document.getElementById("kpis-est").innerHTML=[
+ ["推定 月間売上",yen(D.revenue+D.impact.lo).replace("¥","¥")+"<small>〜"+yen(D.revenue+D.impact.hi).replace("¥","")+"</small>","施策反映後の推定レンジ","est"],
+ ["増収余地","+"+up[0]+"–"+up[1]+"<small>%</small>","月 +"+yen(D.impact.lo)+"–"+yen(D.impact.hi).replace("¥",""),"est"],
+].map(kpiCard).join("");
 // flag
 if(D.cap.blocked.length&&D.peak.fullNights/Math.max(1,D.peak.nights)>=0.5){
   const f=document.getElementById("flag");f.style.display="";
@@ -316,5 +335,25 @@ rows.forEach((r,i)=>{h+='<tr><td>'+(i+1)+'. '+r.t+'</td><td class="num" style="f
 h+='<tr><td style="font-weight:800;border-top:2px solid #B7E3C7;">合計</td><td class="num" style="font-weight:800;border-top:2px solid #B7E3C7;color:var(--brand-dark);">+'+yen(D.impact.lo)+'〜'+yen(D.impact.hi)+'</td><td style="border-top:2px solid #B7E3C7;font-weight:700;color:var(--brand-dark);">売上比 +'+up[0]+'〜'+up[1]+'%</td></tr></tbody></table>';
 h+='<div class="big" style="margin-top:10px;">月間売上 +'+yen(D.impact.lo)+'〜'+yen(D.impact.hi)+'（+'+up[0]+'〜'+up[1]+'%）</div>';
 document.getElementById("impact").innerHTML=h;
+})();
+// 各セクションの結論（見出し直下）
+(function(){
+const full=D.peak.fullNights/Math.max(1,D.peak.nights);
+// 01
+let c1;
+if(full>=0.5){c1='<b>結論：夜間はほぼ満車（'+D.peak.nights+'夜中'+D.peak.fullNights+'夜）で、空きは日中にある。</b>夜間帯にかかる駐車が売上の'+D.nightWindow.share+'%を占め、夜間の料金設定が売上を左右する。';}
+else{c1='<b>結論：満車になる時間帯はなく、稼働に余裕がある。</b>ピークでも'+D.peak.max+'/'+EFF+'台で、料金よりも集客・回収が論点。';}
+document.getElementById("concl-1").innerHTML=c1;
+// 02
+const N=D.nearest||[];const selfY=D.current.dayHour1;
+const med=(a=>{a=a.filter(x=>x!=null).sort((x,y)=>x-y);return a.length?a[a.length>>1]:null})(N.map(c=>c.yph));
+let c2parts=[];
+if(selfY&&med)c2parts.push(selfY>med?'単価'+yen(selfY)+'/時は<b>近隣で最高水準</b>（中央値 約'+yen(med)+'/時）':selfY<med?'単価'+yen(selfY)+'/時は<b>周辺より安い水準</b>（中央値 約'+yen(med)+'/時）':'単価は周辺中央値並み');
+const nr=D.nightRows||[];const selfN=nr.find(r=>r.self);
+if(selfN&&nr.length>1){const others=nr.filter(r=>!r.self).map(r=>r.v);if(selfN.v<=Math.min(...others))c2parts.push('夜間最大'+yen(selfN.v)+'は<b>周辺最安</b>');else if(selfN.v>=Math.max(...others))c2parts.push('夜間最大'+yen(selfN.v)+'は周辺最高');}
+document.getElementById("concl-2").innerHTML='<b>結論：</b>'+(c2parts.length?c2parts.join("。")+"。":"周辺比較は下表参照。");
+// 03
+const first=(D.recs[0]||{}).t||"";
+document.getElementById("concl-3").innerHTML='<b>結論：'+first+(D.recs.length>1?'（ほか'+(D.recs.length-1)+'施策）':'')+'。</b>合計で月 +'+yen(D.impact.lo)+'〜'+yen(D.impact.hi)+'（+'+up[0]+'〜'+up[1]+'%）の増収余地。';
 })();
 </script>`;
