@@ -13,7 +13,7 @@ const median = (a) => { a = a.filter((x) => x != null).sort((x, y) => x - y); re
 
 export function buildRecommendations(metrics, nightComps, nearest, current) {
   const mRev = metrics.revenueMonthly ?? metrics.revenue;
-  const uAmt = metrics.unpaid.amountMonthly ?? metrics.unpaid.amount;
+  const uAmt = metrics.plates?.monthUnpaidAmount ?? metrics.unpaid.amountMonthly ?? metrics.unpaid.amount;
   const nightMed = median(nightComps.map((c) => c.nightMax));
   const dayMedComp = median(nightComps.map((c) => c.dayMax));
   const nearestYphMed = median(nearest.filter((c) => !c.self).map((c) => c.yph));
@@ -73,11 +73,11 @@ export function buildRecommendations(metrics, nightComps, nearest, current) {
 
   // ③ 未払い是正（ナンバーベース）
   const P = metrics.plates;
-  if (metrics.unpaid.count > 0) {
-    let d = `未払い${metrics.unpaid.rate}%・月約${yen(uAmt)}は増収余地。`;
-    if (P?.repeats?.length) d += `<b>常習${P.repeats.length}台で金額の${Math.round(100 * P.repeatAmount / Math.max(1, metrics.unpaid.amount))}%</b>＝ナンバー特定済みで督促・警告の最優先対象。`;
+  if ((metrics.plates?.monthUnpaidCount ?? metrics.unpaid.count) > 0) {
+    let d = `直近月（${P?.monthLabel ?? ""}）の未払いは${P?.monthUnpaidCount ?? metrics.unpaid.count}件・約${yen(uAmt)}。`;
+    if (P?.continuing?.length) d += `<b>過去から継続する${P.continuing.length}台</b>＝ナンバー特定済みで督促・警告の最優先対象。`;
+    else if (P?.repeats?.length) d += `<b>月内で複数回の${P.repeats.length}台</b>＝督促・警告の優先対象。`;
     if (P?.paidElsewhere) d += `<b>支払い実績のある${P.paidElsewhere}台</b>は回収余地あり。`;
-    d += "加えて深夜〜早朝出庫の取りはぐれ対策。";
     recs.push({ kind: "a", t: "未払い（未回収）の是正", d,
       move: { new: `未回収 月約${yen(uAmt)} の圧縮` },
       steps: [
@@ -330,21 +330,25 @@ const maxp=Math.max(...dw.map(d=>d.pct),1);let s="";
 dw.forEach(d=>{const slackD=d.nightPeak!=null&&d.nightPeak<EFF*0.85;
  s+='<div class="hbar"><div class="l">'+d.day+'曜</div><div class="track"><div class="fill" style="width:'+Math.round(100*d.pct/maxp)+'%;background:'+(slackD?"#D98200":"#009B3E")+'"></div></div><div class="v">'+d.pct+'%・夜ピーク'+(d.nightPeak??"—")+'台</div></div>';});
 document.getElementById("c-dow").innerHTML=s;})();
-// 未払い（ナンバー分析）
-(function(){if(!D.unpaid.count)return;const P=D.plates||{};const el=document.getElementById("unpaid-card");
-document.getElementById("unpaid-wrap").style.display="";
-let h='<p class="chart-t">未回収（未払い）が月 約'+yen(D.unpaid.amountMonthly??D.unpaid.amount)+(P.repeats&&P.repeats.length?' — ナンバー分析で当て先が明確':'')+'</p>';
-h+='<p class="chart-c">未払い'+D.unpaid.count+'件＝<b>'+(P.uniqueVehicles||"?")+'台</b>。';
-if(P.repeats&&P.repeats.length)h+='うち<b>常習'+P.repeats.length+'台で'+P.repeatIncidents+'件（'+Math.round(100*P.repeatIncidents/D.unpaid.count)+'%）・約'+yen(P.repeatAmount)+'（金額の'+Math.round(100*P.repeatAmount/Math.max(1,D.unpaid.amount))+'%）</b>を占める。ナンバーは特定済みのため、施策の当て先が絞れる。';
-h+='</p><div class="grid k2"><div>';
-if(P.repeats&&P.repeats.length){
- h+='<p class="chart-t" style="font-size:13px;">複数回未払いの車両（'+P.repeats.length+'台）</p><table style="font-size:12px;"><tr><th>ナンバー</th><th class="num">回数</th><th class="num">金額</th><th>時期</th></tr>';
+// 未払い（ナンバー分析: 直近月で特定・継続をピックアップ）
+(function(){const P=D.plates||{};
+if(!P.monthUnpaidCount){const w=document.getElementById("unpaid-wrap");if(w)w.style.display="none";return;}
+const el=document.getElementById("unpaid-card");document.getElementById("unpaid-wrap").style.display="";
+let h='<p class="chart-t">未回収（未払い）— '+P.monthLabel+'は'+P.monthUnpaidCount+'件・約'+yen(P.monthUnpaidAmount)+(P.continuing&&P.continuing.length?'（うち過去から継続 '+P.continuing.length+'台）':'')+'</p>';
+h+='<p class="chart-c">未払い車両の特定は直近月（'+P.monthLabel+'）ベース。当月の未払いは<b>'+P.uniqueVehicles+'台</b>'+(P.continuing&&P.continuing.length?'、うち<b>'+P.continuing.length+'台は過去の月から継続</b>しており、最優先の対応対象。':'。')+'</p>';
+h+='<div class="grid k2"><div>';
+if(P.continuing&&P.continuing.length){
+ h+='<p class="chart-t" style="font-size:13px;">過去から'+P.monthLabel+'まで継続する未払い車両（'+P.continuing.length+'台）</p><table style="font-size:12px;"><tr><th>ナンバー</th><th class="num">'+P.monthLabel+'</th><th class="num">過去累計</th><th>初回</th></tr>';
+ P.continuing.slice(0,12).forEach(c=>{h+='<tr><td style="font-variant-numeric:tabular-nums">'+esc(c.plate)+'</td><td class="num">'+c.monthCount+'回・'+yen(c.monthAmount)+'</td><td class="num">'+c.pastCount+'回・'+yen(c.pastAmount)+'</td><td>'+esc(c.firstSeen)+'</td></tr>';});
+ h+='</table>'+(P.continuing.length>12?'<div style="font-size:11px;color:var(--faint);margin-top:4px">ほか'+(P.continuing.length-12)+'台</div>':'');
+}else if(P.repeats&&P.repeats.length){
+ h+='<p class="chart-t" style="font-size:13px;">'+P.monthLabel+'内で複数回未払いの車両（'+P.repeats.length+'台）</p><table style="font-size:12px;"><tr><th>ナンバー</th><th class="num">回数</th><th class="num">金額</th><th>時期</th></tr>';
  P.repeats.slice(0,12).forEach(r=>{h+='<tr><td style="font-variant-numeric:tabular-nums">'+esc(r.plate)+'</td><td class="num">'+r.count+'回</td><td class="num">'+yen(r.amount)+'</td><td style="color:var(--grey);font-size:11px">'+esc(r.period)+'</td></tr>';});
  h+='</table>'+(P.repeats.length>12?'<div style="font-size:11px;color:var(--faint);margin-top:4px">ほか'+(P.repeats.length-12)+'台</div>':'');
-}else h+='<p class="chart-c">複数回未払いの車両はなし。</p>';
-h+='</div><div><p class="chart-t" style="font-size:13px;">未払い車両の支払い履歴（期間内）</p><table style="font-size:12px;"><tr><th>区分</th><th class="num">台数</th><th>示唆</th></tr>';
+}else h+='<p class="chart-c">複数回・継続の未払い車両はなし（単発のみ）。</p>';
+h+='</div><div><p class="chart-t" style="font-size:13px;">未払い車両の支払い履歴（全期間）</p><table style="font-size:12px;"><tr><th>区分</th><th class="num">台数</th><th>示唆</th></tr>';
 h+='<tr><td><b>別の来場で支払い実績あり</b></td><td class="num">'+(P.paidElsewhere||0)+'台</td><td style="font-size:11.5px;color:var(--grey)">支払える客のうっかり/機会的スキップ'+(P.example?'（例: '+esc(P.example.plate.split(" ")[0])+'…は来場'+P.example.visits+'回中'+P.example.paid+'回支払い）':'')+'</td></tr>';
-h+='<tr><td>期間内の支払い履歴なし</td><td class="num">'+(P.neverPaid||0)+'台</td><td style="font-size:11.5px;color:var(--grey)">うち'+(P.onceOnly||0)+'台は来場1回のみ（一見）。常習車両は<b>督促・警告の最優先対象</b></td></tr></table></div></div>';
+h+='<tr><td>支払い履歴なし</td><td class="num">'+(P.neverPaid||0)+'台</td><td style="font-size:11.5px;color:var(--grey)">うち'+(P.onceOnly||0)+'台は来場1回のみ（一見）。継続車両は<b>督促・警告の最優先対象</b></td></tr></table></div></div>';
 el.innerHTML=h;})();
 // 周辺マップ
 if(D.map&&D.map.dataUri){const el=document.getElementById("map-card");el.style.display="";

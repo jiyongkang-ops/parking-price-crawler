@@ -148,31 +148,6 @@ export function parseRecords(csvPath, { capacity = null } = {}) {
       nightPeak: cntByDow[d] ? +(peakByDow[d] / cntByDow[d]).toFixed(1) : null };
   });
 
-  // ナンバー分析（未払いの常習・支払い履歴）
-  const byPlate = new Map();
-  for (const r of recs) { if (r.plate.length > 3) { if (!byPlate.has(r.plate)) byPlate.set(r.plate, []); byPlate.get(r.plate).push(r); } }
-  const unpaidRecs = recs.filter((r) => /未払|未収|未決済/.test(r.status) && r.plate.length > 3);
-  const unPlates = new Map();
-  for (const r of unpaidRecs) { if (!unPlates.has(r.plate)) unPlates.set(r.plate, []); unPlates.get(r.plate).push(r); }
-  const fmtMD = (d) => `${d.getMonth() + 1}/${d.getDate()}`;
-  const repeats = [...unPlates.entries()].filter(([, v]) => v.length >= 2)
-    .sort((a, b) => b[1].length - a[1].length)
-    .map(([k, v]) => ({ plate: k, count: v.length, amount: v.reduce((s, r) => s + r.fee, 0),
-      period: `${fmtMD(new Date(Math.min(...v.map((r) => r.in))))}〜${fmtMD(new Date(Math.max(...v.map((r) => r.in))))}` }));
-  let paidElsewhere = 0, neverPaid = 0, onceOnly = 0, bestExample = null;
-  for (const [k, v] of unPlates) {
-    const all = byPlate.get(k);
-    const paidN = all.filter((r) => !/未払|未収|未決済/.test(r.status) && r.paid > 0).length;
-    if (paidN > 0) {
-      paidElsewhere++;
-      if (!bestExample || all.length > bestExample.visits) bestExample = { plate: k, visits: all.length, paid: paidN, un: v.length };
-    } else { neverPaid++; if (all.length === 1) onceOnly++; }
-  }
-  const repeatIncidents = repeats.reduce((s, r) => s + r.count, 0);
-  const repeatAmount = repeats.reduce((s, r) => s + r.amount, 0);
-  const plates = { uniqueVehicles: unPlates.size, repeats, repeatIncidents, repeatAmount,
-    paidElsewhere, neverPaid, onceOnly, example: bestExample };
-
   // 推移分析（週次・月次）: 日次ピーク稼働を一度だけ計算して共用
   const weekly = [], monthly = [];
   {
@@ -205,7 +180,7 @@ export function parseRecords(csvPath, { capacity = null } = {}) {
       const to = new Date(Math.min(monthEnd.getTime(), maxD.getTime() + 864e5));
       const g = recs.filter((r) => r.in >= from && r.in < to);
       const dInM = Math.max(1, Math.round((to - from) / 864e5));
-      monthly.push({ label: `${String(m.getFullYear()).slice(2)}/${m.getMonth() + 1}`, days: dInM,
+      monthly.push({ from, to, label: `${String(m.getFullYear()).slice(2)}/${m.getMonth() + 1}`, days: dInM,
         fullDays: Math.round((monthEnd - m) / 864e5),
         sessions: g.length, revenue: g.reduce((s2, r) => s2 + r.paid, 0), peakAvg: peakAvgIn(from, to) });
     }
@@ -214,6 +189,56 @@ export function parseRecords(csvPath, { capacity = null } = {}) {
   const monthsSpan = +(days / 30.44).toFixed(2);
   const revenueMonthly = Math.round(collected / Math.max(1, monthsSpan));
   const unpaidMonthly = Math.round(unpaidAmt / Math.max(1, monthsSpan));
+
+  // ナンバー分析：未払い車両の特定は「直近のフル月」に限定し、
+  // その中で「過去から直近月まで続いている車両（継続）」をピックアップする。
+  const byPlate = new Map();
+  for (const r of recs) { if (r.plate.length > 3) { if (!byPlate.has(r.plate)) byPlate.set(r.plate, []); byPlate.get(r.plate).push(r); } }
+  const isUn = (r) => /未払|未収|未決済/.test(r.status);
+  const unpaidAll = recs.filter((r) => isUn(r) && r.plate.length > 3);
+  // 対象月 = 最後のフル月（末尾が月途中ならその前月）。単月データなら全期間。
+  const fullMonths = monthly.filter((m) => m.days >= (m.fullDays || 28) * 0.8);
+  const tgt = fullMonths.at(-1) ?? { from: minD, to: new Date(maxD.getTime() + 864e5), label: `${String(minD.getFullYear()).slice(2)}/${minD.getMonth() + 1}` };
+  const inMonth = (r) => r.in >= tgt.from && r.in < tgt.to;
+  const unMonth = unpaidAll.filter(inMonth);
+  const unPlates = new Map();
+  for (const r of unMonth) { if (!unPlates.has(r.plate)) unPlates.set(r.plate, []); unPlates.get(r.plate).push(r); }
+  const fmtYM = (d) => `${String(d.getFullYear()).slice(2)}/${d.getMonth() + 1}`;
+  const fmtMD = (d) => `${d.getMonth() + 1}/${d.getDate()}`;
+  // 継続: 対象月に未払いがあり、かつ対象月より前にも未払いがある車両
+  const continuing = [];
+  const monthRepeats = [];
+  for (const [k, v] of unPlates) {
+    const past = unpaidAll.filter((r) => r.plate === k && r.in < tgt.from);
+    if (past.length > 0) {
+      continuing.push({ plate: k,
+        monthCount: v.length, monthAmount: v.reduce((s2, r) => s2 + r.fee, 0),
+        pastCount: past.length, pastAmount: past.reduce((s2, r) => s2 + r.fee, 0),
+        firstSeen: fmtYM(new Date(Math.min(...past.map((r) => r.in)))) });
+    }
+    if (v.length >= 2) monthRepeats.push({ plate: k, count: v.length, amount: v.reduce((s2, r) => s2 + r.fee, 0),
+      period: `${fmtMD(new Date(Math.min(...v.map((r) => r.in))))}〜${fmtMD(new Date(Math.max(...v.map((r) => r.in))))}` });
+  }
+  continuing.sort((a, b) => (b.pastCount + b.monthCount) - (a.pastCount + a.monthCount));
+  monthRepeats.sort((a, b) => b.count - a.count);
+  // 支払い履歴（対象月の未払い車両について、全期間での支払実績）
+  let paidElsewhere = 0, neverPaid = 0, onceOnly = 0, bestExample = null;
+  for (const [k, v] of unPlates) {
+    const all = byPlate.get(k);
+    const paidN = all.filter((r) => !isUn(r) && r.paid > 0).length;
+    if (paidN > 0) {
+      paidElsewhere++;
+      if (!bestExample || all.length > bestExample.visits) bestExample = { plate: k, visits: all.length, paid: paidN, un: v.length };
+    } else { neverPaid++; if (all.length === 1) onceOnly++; }
+  }
+  const repeats = monthRepeats;
+  const repeatIncidents = repeats.reduce((s2, r) => s2 + r.count, 0);
+  const repeatAmount = repeats.reduce((s2, r) => s2 + r.amount, 0);
+  const plates = { monthLabel: tgt.label,
+    monthUnpaidCount: unMonth.length, monthUnpaidAmount: unMonth.reduce((s2, r) => s2 + r.fee, 0),
+    uniqueVehicles: unPlates.size, continuing, repeats, repeatIncidents, repeatAmount,
+    paidElsewhere, neverPaid, onceOnly, example: bestExample };
+
 
   // 日中実効料金（入庫8-16時・同日20時前出庫）
   const dayS = recs.filter((r) => r.out && r.in.getHours() >= 8 && r.in.getHours() <= 16 && r.out.getHours() < 20 && r.out.getDate() === r.in.getDate() && r.fee > 0);
