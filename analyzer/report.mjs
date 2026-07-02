@@ -125,10 +125,10 @@ const TEMPLATE = `<title>駐車場 料金診断</title>
   .logo{margin-bottom:16px;} .logo svg{height:18px;width:auto;display:block;} .logo path,.logo polygon{fill:#fff;} .logo .lg2{fill:rgba(255,255,255,.82);}
   .ic{width:14px;height:14px;flex:0 0 14px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
   .em svg{width:20px;height:20px;stroke:var(--brand-dark);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;} header .meta{font-size:13px;opacity:.92;display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;} header .meta b{font-weight:700;} header .meta>span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
-  .section{margin-top:28px;} .sec-h{display:flex;align-items:baseline;gap:12px;margin:0 0 4px;} .sec-h .no{color:var(--brand);font-weight:800;font-size:14px;} .sec-h h2{font-size:19px;font-weight:800;margin:0;}
+  .section{margin-top:20px;} .sec-h{display:flex;align-items:baseline;gap:12px;margin:0 0 4px;} .sec-h .no{color:var(--brand);font-weight:800;font-size:14px;} .sec-h h2{font-size:19px;font-weight:800;margin:0;}
   .sec-sub{color:var(--grey);font-size:13.5px;margin:2px 0 16px;padding-left:26px;}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:20px 22px;box-shadow:0 1px 2px rgba(0,0,0,.03);}
-  .grid{display:grid;gap:16px;} .k4{grid-template-columns:repeat(4,1fr);} .k2{grid-template-columns:1fr 1fr;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:15px 18px;box-shadow:0 1px 2px rgba(0,0,0,.03);}
+  .grid{display:grid;gap:12px;} .k4{grid-template-columns:repeat(4,1fr);} .k2{grid-template-columns:1fr 1fr;}
   @media(max-width:720px){.k4{grid-template-columns:1fr 1fr;}.k2{grid-template-columns:1fr;}}
   .kpi-wrap{display:grid;grid-template-columns:3fr 2fr;gap:16px;margin-bottom:16px;}
   @media(max-width:880px){.kpi-wrap{grid-template-columns:1fr;}}
@@ -136,10 +136,10 @@ const TEMPLATE = `<title>駐車場 料金診断</title>
   .kpi-glabel.est{color:var(--brand-dark);}
   .k3{grid-template-columns:repeat(3,1fr);} .k2e{grid-template-columns:repeat(2,1fr);}
   .kpi.est{background:var(--brand-light);border-color:#B7E3C7;}
-  .concl{background:var(--brand-light);border-left:3px solid var(--brand);border-radius:6px;padding:10px 14px;font-size:13.5px;margin:6px 0 14px;color:var(--ink);}
+  .concl{background:var(--brand-light);border-left:3px solid var(--brand);border-radius:6px;padding:8px 12px;font-size:13px;margin:4px 0 10px;color:var(--ink);}
   .concl b{color:var(--brand-dark);}
   .kpi{display:flex;flex-direction:column;} .kpi .lbl{font-size:11.5px;color:var(--grey);font-weight:700;white-space:nowrap;} .kpi .val{font-size:24px;font-weight:800;margin-top:5px;white-space:nowrap;letter-spacing:-.01em;} .kpi .val small{font-size:13px;color:var(--grey);font-weight:700;} .kpi .sub{font-size:11.5px;color:var(--faint);margin-top:auto;padding-top:6px;} .kpi.accent{border-left:3px solid var(--brand);}
-  .chart-t{font-weight:700;font-size:14px;margin:0 0 3px;} .chart-c{color:var(--grey);font-size:12px;margin:0 0 14px;}
+  .chart-t{font-weight:700;font-size:14px;margin:0 0 3px;} .chart-c{color:var(--grey);font-size:12px;margin:0 0 10px;}
   .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--grey);margin-top:10px;} .legend span{display:inline-flex;align-items:center;gap:6px;} .dot{width:11px;height:11px;border-radius:3px;display:inline-block;}
   table{border-collapse:collapse;width:100%;font-size:13px;} th,td{padding:9px 11px;border-bottom:1px solid var(--line-soft);text-align:left;} th{font-size:11.5px;color:var(--grey);font-weight:700;background:#F0F2F0;} td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;} tr.hot td{background:var(--amber-bg);}
   .tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:5px;background:#EEF1EE;color:#3d7a1f;white-space:nowrap;}
@@ -148,7 +148,7 @@ const TEMPLATE = `<title>駐車場 料金診断</title>
   .callout{background:var(--brand-light);border:1px solid #B7E3C7;border-radius:8px;padding:18px 20px;margin-top:16px;} .callout .big{font-size:26px;font-weight:800;color:var(--brand-dark);}
   .flag{background:var(--brand-light);border:1px solid #B7E3C7;border-radius:8px;padding:16px 20px;margin-bottom:16px;display:flex;gap:14px;} .flag .em{font-size:22px;} .flag .t{font-weight:800;font-size:15px;color:var(--brand-dark);} .flag .d{font-size:13px;color:var(--brand-dark);margin-top:2px;}
   .unpaid-card{border-left:3px solid var(--amber);} .unpaid-card .chart-t{color:#9A5B00;}
-  .hbar{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:12px;} .hbar .l{width:92px;color:var(--grey);} .hbar .track{flex:1;background:#EEF1EE;border-radius:4px;} .hbar .fill{height:14px;border-radius:4px;} .hbar .v{width:150px;text-align:right;font-variant-numeric:tabular-nums;}
+  .hbar{display:flex;align-items:center;gap:8px;margin:3px 0;font-size:12px;} .hbar .l{width:92px;color:var(--grey);} .hbar .track{flex:1;background:#EEF1EE;border-radius:4px;} .hbar .fill{height:14px;border-radius:4px;} .hbar .v{width:150px;text-align:right;font-variant-numeric:tabular-nums;}
   svg{display:block;width:100%;height:auto;overflow:visible;}
   @media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}body{background:#fff;}.card,.kpi,.callout,.flag,.rec{break-inside:avoid;}.section{break-inside:avoid-page;}}
 </style>
@@ -165,11 +165,11 @@ const TEMPLATE = `<title>駐車場 料金診断</title>
     <div class="concl" id="concl-1"></div>
     <div class="card"><p class="chart-t">時間帯別 稼働台数（平日・平均同時利用）</p><div id="c-occ"></div>
       <div class="legend"><span><span class="dot" style="background:var(--brand)"></span>稼働台数</span><span><span class="dot" style="background:var(--amber)"></span>入庫数</span></div></div>
-    <div class="grid k2" style="margin-top:16px;">
+    <div class="grid k2" style="margin-top:12px;">
       <div class="card" id="space-card"><p class="chart-t">車室別 利用回数</p><div id="c-space"></div></div>
       <div class="card" id="fee-card"><p class="chart-t">料金階層の内訳</p><div id="c-fee"></div></div>
     </div>
-    <div class="grid k2" style="margin-top:16px;">
+    <div class="grid k2" style="margin-top:12px;">
       <div class="card"><p class="chart-t">時間帯別 売上構成（入庫時刻ベース）</p><p class="chart-c" id="revband-c"></p><div id="c-revband"></div></div>
       <div class="card"><p class="chart-t">曜日別 売上シェアと夜間ピーク稼働</p><p class="chart-c" id="dow-c"></p><div id="c-dow"></div></div>
     </div>
@@ -233,7 +233,7 @@ if(D.cap.blocked.length&&D.peak.fullNights/Math.max(1,D.peak.nights)>=0.5){
   f.innerHTML='<div class="em"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4.5"/><path d="M12 15.8h.01"/></svg></div><div><div class="t">前提：車室'+D.cap.blocked.join("・")+'は封鎖。実効キャパ'+EFF+'台が上限。</div><div class="d"><b>'+EFF+'台がフル稼働の上限</b>。夜間ピークは'+D.peak.nights+'夜中'+D.peak.fullNights+'夜が満車。供給を増やせない以上、ピーク時に売上を伸ばす手段は<b>価格</b>。</div></div>';
 }
 // 稼働×入庫
-(function(){const O=D.occ,E=D.ent,W=880,H=240,pL=34,pB=26,pT=10,pw=W-pL-20,ph=H-pB-pT;
+(function(){const O=D.occ,E=D.ent,W=880,H=210,pL=34,pB=24,pT=8,pw=W-pL-20,ph=H-pB-pT;
 const x=i=>pL+i*(pw/24)+(pw/24)/2,yO=v=>pT+ph*(1-v/EFF);const mE=Math.max(...E,1),yE=v=>pT+ph*(1-v/mE);
 let s='<svg viewBox="0 0 '+W+' '+H+'">';
 for(let g=0;g<=EFF;g+=Math.max(1,Math.ceil(EFF/3))){const gy=yO(g);s+='<line x1="'+pL+'" y1="'+gy+'" x2="'+(W-20)+'" y2="'+gy+'" stroke="rgba(0,0,0,.06)"/><text x="'+(pL-6)+'" y="'+(gy+4)+'" text-anchor="end" font-size="10" fill="#9AA096">'+g+'</text>';}
@@ -245,7 +245,7 @@ document.getElementById("c-occ").innerHTML=s+"</svg>";})();
 (function(){
 if(D.cap.spaceTracking===false){document.getElementById("space-card").style.display="none";document.getElementById("fee-card").style.gridColumn="span 2";return;}
 const all=[];for(let n=1;n<=D.cap.nominal;n++)all.push([n,D.spaceUse[n]||0]);
-const max=Math.max(...all.map(a=>a[1]),1);const W=440,bh=13,gap=4,pL=44,pT=4,H=pT+all.length*(bh+gap);
+const max=Math.max(...all.map(a=>a[1]),1);const W=440,bh=11,gap=3,pL=44,pT=4,H=pT+all.length*(bh+gap);
 let s='<svg viewBox="0 0 '+W+' '+H+'">';
 all.forEach(([k,v],i)=>{const y=pT+i*(bh+gap);const dead=v===0;
  s+='<text x="'+(pL-6)+'" y="'+(y+bh-2)+'" text-anchor="end" font-size="10" fill="'+(dead?"#8a7a55":"#9AA096")+'">車室'+k+'</text>';
