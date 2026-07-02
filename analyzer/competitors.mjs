@@ -55,6 +55,43 @@ export function crawlerCompetitors({ lat, lng, radiusM = 400, dataDir = "data" }
     .sort((a, b) => a.dist - b.dist);
 }
 
+
+// 座標を持たない収集済み物件（タイムズ/エコロ等）を住所ジオコーディングで補完。
+// locality（例: 六本木）を含む住所だけを対象にし、結果は data/geocode-cache.json に永続キャッシュ。
+export async function geocodeNoCoordCompetitors({ lat, lng, radiusM = 500, locality, dataDir = "data", limit = 25 }) {
+  const key = process.env.GOOGLE_MAPS_KEY;
+  if (!key || !locality || locality.length < 2) return [];
+  const cachePath = path.join(dataDir, "geocode-cache.json");
+  let cache = {}; try { cache = JSON.parse(fs.readFileSync(cachePath, "utf8")); } catch { /* new */ }
+  const cands = loadLatest(dataDir)
+    .filter((r) => !(r.lat && r.lng) && (r.address || "").includes(locality)).slice(0, limit);
+  const out = [];
+  for (const r of cands) {
+    const addr = r.address;
+    let g = cache[addr];
+    if (g === undefined) {
+      try {
+        const res = await (await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(addr)}&language=ja&region=jp&key=${key}`)).json();
+        g = res.status === "OK" ? res.results[0].geometry.location : null;
+      } catch { g = null; }
+      cache[addr] = g;
+      await new Promise((res) => setTimeout(res, 120));
+    }
+    if (!g) continue;
+    const dist = haversine(lat, lng, g.lat, g.lng);
+    if (dist > radiusM) continue;
+    const fee = normalizeFees(r);
+    const u0 = (r.unitCharges ?? [])[0];
+    out.push({ source: "crawler+geocode", operator: r.operator, opLabel: OP_LABEL[r.operator] ?? r.operator,
+      name: r.name, address: r.address, dist, lat: g.lat, lng: g.lng,
+      unit: u0 ? `${u0.perMinutes}分${u0.amountYen}円` : null, yph: fee.yph,
+      nightMax: fee.max.find((m) => m.type === "night")?.amountYen ?? null,
+      dayMax: fee.max.find((m) => m.type === "daytime")?.amountYen ?? fee.max.find((m) => m.type === "d24h")?.amountYen ?? null });
+  }
+  try { fs.writeFileSync(cachePath, JSON.stringify(cache)); } catch { /* ignore */ }
+  return out.sort((a, b) => a.dist - b.dist);
+}
+
 // 周辺の最近の料金変更（時系列 changedFromPrev）
 export function recentPriceChanges({ lat, lng, radiusM = 500, dataDir = "data", limit = 20 }) {
   const changes = [];

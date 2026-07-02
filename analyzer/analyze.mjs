@@ -11,7 +11,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parseRecords } from "./parse-records.mjs";
-import { crawlerCompetitors, parkopediaCompetitors, recentPriceChanges } from "./competitors.mjs";
+import { crawlerCompetitors, parkopediaCompetitors, recentPriceChanges, geocodeNoCoordCompetitors } from "./competitors.mjs";
 import { renderReport } from "./report.mjs";
 import { staticMapDataUri } from "./map.mjs";
 import { printToPdf } from "./pdf.mjs";
@@ -27,9 +27,13 @@ console.log(`[分析] ${metrics.parkName} / ${metrics.sessions}件 / 実効${met
 const radiusM = cfg.radiusM ?? 400;
 const nearestLimit = cfg.nearestLimit ?? 12;
 
-// 夜間最大（自前クローラ）
-const nightComps = crawlerCompetitors({ lat: cfg.lat, lng: cfg.lng, radiusM: Math.max(radiusM, 500) });
-console.log(`[夜間最大] 自前クローラ: ${nightComps.length}件（うち夜間最大あり ${nightComps.filter((c) => c.nightMax).length}件）`);
+// 夜間最大（自前クローラ＋座標なし物件のジオコーディング補完）
+let nightComps = crawlerCompetitors({ lat: cfg.lat, lng: cfg.lng, radiusM: Math.max(radiusM, 500) });
+const locality = cfg.locality ?? ((cfg.address || "").match(/(?:区|市|郡|町|村)([^\d０-９\-－]+)/)?.[1]?.replace(/丁目.*/, "") ?? null);
+const geoComps = await geocodeNoCoordCompetitors({ lat: cfg.lat, lng: cfg.lng, radiusM: Math.max(radiusM, 500), locality });
+const seen = new Set(nightComps.map((c) => c.operator + ":" + c.name));
+nightComps = nightComps.concat(geoComps.filter((c) => !seen.has(c.operator + ":" + c.name))).sort((a, b) => a.dist - b.dist);
+console.log(`[夜間最大] クローラ＋補完: ${nightComps.length}件（うち夜間最大あり ${nightComps.filter((c) => c.nightMax).length}件 / 補完${geoComps.length}件, locality=${locality ?? "-"}）`);
 
 // 最寄り（Parkopedia優先 → 不可なら自前クローラ距離順で代替）
 // 単価不明・異常値(100円/時未満)は比較対象から除外

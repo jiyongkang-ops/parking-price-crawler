@@ -43,7 +43,7 @@ export function maxType(condition) {
     if (s < 12 && e <= 21) return { type: "daytime" };
     return { type: "other" };
   }
-  if (/夜間/.test(c)) return { type: "night" };
+  if (/夜間|夜/.test(c)) return { type: "night" };
   return { type: "other" };
 }
 
@@ -73,7 +73,7 @@ export function normalizeFees(rec) {
 
   const max = (rec.maxFees ?? []).map((m) => ({
     day: dayType(m.scope),
-    ...maxType(m.condition),
+    ...maxType(`${m.scope ?? ""} ${m.condition ?? ""}`),
     amountYen: m.amountYen,
   }));
 
