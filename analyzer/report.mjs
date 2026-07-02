@@ -257,9 +257,10 @@ if(D.map&&D.map.dataUri){const el=document.getElementById("map-card");el.style.d
 document.getElementById("nearest-card").style.display="";
 const selfY=D.current.dayHour1;
 const med=(a=>{a=a.filter(x=>x!=null).sort((x,y)=>x-y);return a.length?a[a.length>>1]:null})(N.map(c=>c.yph));
-document.getElementById("nearest-c").innerHTML=selfY?('当駐車場の<b>'+yen(selfY)+'/時は'+(med&&selfY>med?'近隣で最高水準':'近隣比較')+'</b>（周辺中央値 約'+yen(med)+'/時）。'):'';
+const pos=med==null||selfY==null?"":(selfY>med?"high":(selfY<med?"low":"mid"));
+document.getElementById("nearest-c").innerHTML=selfY?('当駐車場の<b>'+yen(selfY)+'/時は'+(pos==="high"?'近隣で最高水準':pos==="low"?'近隣で安い水準':'近隣中央値並み')+'</b>（周辺中央値 約'+yen(med)+'/時）。'):'';
 let rows='';
-if(selfY)rows+='<tr class="hot"><td class="num">—</td><td style="font-weight:800">当駐車場（'+esc(D.park)+'）</td><td><span class="tag">自駐車場</span></td><td class="num">'+esc(D.current.unit||"")+'</td><td class="num" style="font-weight:800;color:#D0433A">'+yen(selfY)+(med&&selfY>med?' ⚠最高':'')+'</td></tr>';
+if(selfY)rows+='<tr class="hot"><td class="num">—</td><td style="font-weight:800">当駐車場（'+esc(D.park)+'）</td><td><span class="tag">自駐車場</span></td><td class="num">'+esc(D.current.unit||"")+'</td><td class="num" style="font-weight:800;color:'+(pos==="high"?"#D0433A":"#00622A")+'">'+yen(selfY)+(pos==="high"?' ⚠最高':'')+'</td></tr>';
 N.forEach(c=>{rows+='<tr><td class="num">'+(c.dist!=null?c.dist+'m':'—')+'</td><td>'+esc(c.name)+'</td><td><span class="tag">'+esc(c.op)+'</span></td><td class="num">'+esc(c.unit||"—")+'</td><td class="num">'+yen(c.yph)+'</td></tr>';});
 document.getElementById("tbl-nearest").innerHTML=rows;})();
 // 夜間最大比較

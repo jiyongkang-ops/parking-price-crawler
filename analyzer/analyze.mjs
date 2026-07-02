@@ -32,16 +32,20 @@ const nightComps = crawlerCompetitors({ lat: cfg.lat, lng: cfg.lng, radiusM: Mat
 console.log(`[夜間最大] 自前クローラ: ${nightComps.length}件（うち夜間最大あり ${nightComps.filter((c) => c.nightMax).length}件）`);
 
 // 最寄り（Parkopedia優先 → 不可なら自前クローラ距離順で代替）
-let nearest = [], nearestSource = "";
+// 単価不明・異常値(100円/時未満)は比較対象から除外
+const validFee = (c) => c.yph != null && c.yph >= 100;
+let nearest = [], nearestSource = "", excluded = 0;
 const pk = await parkopediaCompetitors({ lat: cfg.lat, lng: cfg.lng, radiusM });
 if (pk.available && pk.items.length) {
-  nearest = pk.items.slice(0, nearestLimit);
+  excluded = pk.items.length - pk.items.filter(validFee).length;
+  nearest = pk.items.filter(validFee).slice(0, nearestLimit);
   nearestSource = "parkopedia";
 } else {
-  nearest = nightComps.slice(0, nearestLimit);
+  excluded = nightComps.length - nightComps.filter(validFee).length;
+  nearest = nightComps.filter(validFee).slice(0, nearestLimit);
   nearestSource = "crawler(代替)";
 }
-console.log(`[最寄り] ${nearestSource}: ${nearest.length}件${pk.error ? "（Parkopedia: " + pk.error + "）" : ""}`);
+console.log(`[最寄り] ${nearestSource}: ${nearest.length}件（単価不明/異常値 ${excluded}件を除外）${pk.error ? "（Parkopedia: " + pk.error + "）" : ""}`);
 
 const changes = recentPriceChanges({ lat: cfg.lat, lng: cfg.lng, radiusM: radiusM + 200 });
 console.log(`[変更] 周辺の最近の料金変更: ${changes.length}件`);
